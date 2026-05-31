@@ -285,6 +285,144 @@ function safeAccount(account) {
   return result;
 }
 
+function nextMemberNo(state) {
+  return state.members.reduce((max, member) => Math.max(max, Number(member.memberNo || 0)), 0) + 1;
+}
+
+function productDefaults(state, payload, current) {
+  const productName = String(payload.productName || current && current.productName || "20次卡").trim();
+  const lessons = Number(payload.totalLessons || current && current.totalLessons || 20);
+  const product =
+    state.courseProducts.find((item) => item.name === productName) ||
+    state.courseProducts.find((item) => item.type === payload.productType) ||
+    state.courseProducts[0] ||
+    {};
+  return {
+    productId: payload.productId || current && current.productId || product.id || "product-class-pack",
+    productName: productName || product.name || "20次卡",
+    productType: payload.productType || current && current.productType || product.type || "class_pack",
+    totalLessons: Number.isFinite(lessons) ? lessons : Number(product.totalLessons || 20)
+  };
+}
+
+function memberPayload(state, payload, current) {
+  const member = payload.member || payload;
+  const product = productDefaults(state, member, current);
+  return Object.assign({}, current || {}, product, {
+    chineseName: String(member.chineseName || current && current.chineseName || "").trim(),
+    phone: String(member.phone || "").trim(),
+    wechat: String(member.wechat || current && current.wechat || "").trim(),
+    campus: String(member.campus || current && current.campus || "").trim(),
+    coach: String(member.coach || current && current.coach || "").trim(),
+    cardExpireDate: String(member.cardExpireDate || current && current.cardExpireDate || "").trim(),
+    notes: String(member.notes || "").trim()
+  });
+}
+
+function saveMember(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const raw = payload.member || payload;
+  const id = String(raw.id || "").trim();
+  const current = id ? state.members.find((item) => item.id === id) : null;
+  const member = memberPayload(state, raw, current);
+  if (!member.chineseName) throw new Error("学员姓名不能为空");
+
+  if (current) {
+    Object.assign(current, member, { updatedAt: new Date().toISOString() });
+    return { message: "学员已保存", member: current };
+  }
+
+  const created = Object.assign(member, {
+    id: newId("member"),
+    memberNo: nextMemberNo(state),
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+  state.members.push(created);
+  return { message: "学员已新增", member: created };
+}
+
+function bulkImportMembers(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  rows.forEach((row) => {
+    const name = String(row.chineseName || "").trim();
+    if (!name) {
+      skipped += 1;
+      return;
+    }
+    const current = state.members.find((member) => member.chineseName === name && (!row.phone || member.phone === row.phone));
+    const member = memberPayload(state, row, current);
+    if (current) {
+      Object.assign(current, member, { updatedAt: new Date().toISOString() });
+      updated += 1;
+      return;
+    }
+    state.members.push(
+      Object.assign(member, {
+        id: newId("member"),
+        memberNo: nextMemberNo(state),
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      })
+    );
+    created += 1;
+  });
+
+  return { message: "已导入：新增 " + created + "，更新 " + updated + "，跳过 " + skipped, created, updated, skipped };
+}
+
+function saveAccount(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const raw = payload.account || payload;
+  const accountName = rules.normalizeAccount(raw.account);
+  const role = rules.roleFromAccount(accountName);
+  if (!role) throw new Error("账号必须是 admin、jl 开头或 xy 开头");
+
+  const id = String(raw.id || "").trim();
+  const duplicate = state.accounts.find((item) => item.account === accountName && item.id !== id);
+  if (duplicate) throw new Error("账号已存在");
+
+  const current = id ? state.accounts.find((item) => item.id === id) : null;
+  let memberId = raw.memberId || current && current.memberId || "";
+  if (role === "student") {
+    const memberName = String(raw.memberName || raw.fullName || "").trim();
+    const member = state.members.find((item) => item.chineseName === memberName || item.id === memberId);
+    if (!member) throw new Error("学员账号需要填写已存在的学员姓名");
+    memberId = member.id;
+  }
+
+  const next = Object.assign({}, current || {}, {
+    account: accountName,
+    role,
+    fullName: String(raw.fullName || raw.memberName || raw.coachName || accountName).trim(),
+    campus: String(raw.campus || current && current.campus || "").trim(),
+    coachName: role === "coach" ? String(raw.coachName || raw.fullName || "").trim() : "",
+    memberId: role === "student" ? memberId : "",
+    status: raw.status || current && current.status || "active",
+    updatedAt: new Date().toISOString()
+  });
+
+  if (!current || raw.password) {
+    next.password = String(raw.password || DEFAULT_PASSWORD);
+  }
+  if (role === "coach" && !next.coachName) throw new Error("教练账号需要填写教练名");
+
+  if (current) {
+    Object.assign(current, next);
+    return { message: "账号已保存", account: safeAccount(current) };
+  }
+
+  next.id = newId("account");
+  next.createdAt = new Date().toISOString();
+  state.accounts.push(next);
+  return { message: "账号已新增", account: safeAccount(next) };
+}
+
 function login(payload) {
   const state = loadState();
   const accountName = rules.normalizeAccount(payload.account);
@@ -503,6 +641,9 @@ function call(action, payload) {
 
   let result;
   if (action === "getHomeData") result = homeData(state, viewer);
+  else if (action === "saveMember") result = saveMember(state, viewer, payload);
+  else if (action === "bulkImportMembers") result = bulkImportMembers(state, viewer, payload);
+  else if (action === "saveAccount") result = saveAccount(state, viewer, payload);
   else if (action === "createBookingRequest") result = createBookingRequest(state, viewer, payload);
   else if (action === "approveBookingRequest") result = approveBookingRequest(state, viewer, payload);
   else if (action === "rejectBookingRequest") result = rejectBookingRequest(state, viewer, payload);

@@ -1,0 +1,7 @@
+.import-tip {
+  margin-bottom: 14rpx;
+}
+
+.card-head {
+  margin-bottom: 8rpx;
+}

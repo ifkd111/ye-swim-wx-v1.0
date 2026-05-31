@@ -2,20 +2,65 @@
   <view class="topbar">
     <view>
       <view class="title">学员</view>
-      <view class="subtitle">课时、校区、教练和状态</view>
+      <view class="subtitle">新增、修改、查课时</view>
     </view>
+    <button class="primary mini" bindtap="resetForm">新增</button>
+  </view>
+
+  <view class="toolbar quick-toolbar">
+    <button bindtap="goImport">批量添加</button>
+    <button bindtap="resetForm">清空表单</button>
+  </view>
+
+  <view class="card">
+    <view class="card-title">{{form.id ? '修改学员' : '新增学员'}}</view>
+    <view class="form-grid">
+      <view class="field">
+        <text class="field-label">姓名</text>
+        <input value="{{form.chineseName}}" placeholder="白卓可" bindinput="input" data-field="chineseName" />
+      </view>
+      <view class="field">
+        <text class="field-label">手机号</text>
+        <input type="number" value="{{form.phone}}" placeholder="可不填" bindinput="input" data-field="phone" />
+      </view>
+      <view class="field">
+        <text class="field-label">校区</text>
+        <input value="{{form.campus}}" placeholder="绿洲" bindinput="input" data-field="campus" />
+      </view>
+      <view class="field">
+        <text class="field-label">教练</text>
+        <input value="{{form.coach}}" placeholder="绿洲教练" bindinput="input" data-field="coach" />
+      </view>
+      <view class="field">
+        <text class="field-label">课程</text>
+        <input value="{{form.productName}}" placeholder="20次卡" bindinput="input" data-field="productName" />
+      </view>
+      <view class="field">
+        <text class="field-label">总课时</text>
+        <input type="number" value="{{form.totalLessons}}" placeholder="20" bindinput="input" data-field="totalLessons" />
+      </view>
+    </view>
+    <view class="field notes-field">
+      <text class="field-label">备注名</text>
+      <input value="{{form.notes}}" placeholder="同名、家长名、特殊说明" bindinput="input" data-field="notes" />
+    </view>
+    <button class="primary" bindtap="saveMember">保存学员</button>
   </view>
 
   <view class="card">
     <block wx:if="{{members.length}}">
-      <view class="list-item" wx:for="{{members}}" wx:key="id">
+      <view class="list-item tappable" wx:for="{{members}}" wx:key="id" bindtap="editMember" data-id="{{item.id}}">
         <view class="row">
           <view>
             <view class="name">{{item.chineseName}}</view>
             <view class="meta">#{{item.memberNo}} · {{item.campus}} · {{item.coach}}</view>
             <view class="meta">{{item.productName}} · 总 {{item.totalLessons}} / 已消 {{item.usedLessons}} / 剩余 {{item.remainingLessons}}</view>
+            <view class="meta" wx:if="{{item.notes}}">备注：{{item.notes}}</view>
           </view>
-          <text class="badge {{item.status === '欠课' ? 'danger' : item.status === '即将用完' ? 'warn' : ''}}">{{item.status}}</text>
+          <view class="right-stack">
+            <text class="badge {{item.status === '欠课' ? 'danger' : item.status === '即将用完' ? 'warn' : ''}}">{{item.status}}</text>
+            <text class="link-text">编辑</text>
+          </view>
         </view>
       </view>
     </block>

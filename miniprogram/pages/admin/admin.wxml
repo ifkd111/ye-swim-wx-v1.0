@@ -8,21 +8,25 @@
   </view>
 
   <view class="grid">
-    <view class="metric">
+    <view class="metric tappable" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
       <text class="metric-value">{{stats.pendingBookings}}</text>
       <text class="metric-label">待审批预约</text>
+      <text class="metric-action">点我审批</text>
     </view>
-    <view class="metric">
+    <view class="metric tappable" bindtap="go" data-url="/pages/admin-schedule/admin-schedule">
       <text class="metric-value">{{stats.todaySchedules}}</text>
       <text class="metric-label">今日课程</text>
+      <text class="metric-action">查看和排课</text>
     </view>
-    <view class="metric">
+    <view class="metric tappable" bindtap="go" data-url="/pages/admin-members/admin-members">
       <text class="metric-value">{{stats.members}}</text>
       <text class="metric-label">学员</text>
+      <text class="metric-action">新增和修改</text>
     </view>
-    <view class="metric">
+    <view class="metric tappable" bindtap="go" data-url="/pages/admin-staff/admin-staff">
       <text class="metric-value">{{stats.coaches}}</text>
       <text class="metric-label">教练账号</text>
+      <text class="metric-action">账号管理</text>
     </view>
   </view>
 
@@ -43,17 +47,24 @@
       </view>
       <view class="nav-card" bindtap="go" data-url="/pages/admin-members/admin-members">
         <text class="nav-title">学员</text>
-        <text class="nav-meta">课时与状态</text>
+        <text class="nav-meta">新增、修改、查课时</text>
       </view>
       <view class="nav-card" bindtap="go" data-url="/pages/admin-staff/admin-staff">
         <text class="nav-title">账号</text>
-        <text class="nav-meta">admin / jl / xy</text>
+        <text class="nav-meta">新增和修改账号</text>
+      </view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-import/admin-import">
+        <text class="nav-title">批量导入</text>
+        <text class="nav-meta">粘贴名单一键录入</text>
       </view>
     </view>
   </view>
 
-  <view class="card">
-    <view class="card-title">最新预约</view>
+  <view class="card tappable" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
+    <view class="row card-head">
+      <view class="card-title">最新预约</view>
+      <text class="link-text">去审批</text>
+    </view>
     <block wx:if="{{pendingBookings.length}}">
       <view class="list-item" wx:for="{{pendingBookings}}" wx:key="id">
         <view class="row">

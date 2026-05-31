@@ -1,0 +1,54 @@
+<view class="page">
+  <view class="topbar">
+    <view>
+      <view class="title">批量导入</view>
+      <view class="subtitle">复制名单，预览无误后再导入</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">默认信息</view>
+    <view class="form-grid">
+      <view class="field">
+        <text class="field-label">默认校区</text>
+        <input value="{{defaults.campus}}" placeholder="绿洲" bindinput="inputDefault" data-field="campus" />
+      </view>
+      <view class="field">
+        <text class="field-label">默认教练</text>
+        <input value="{{defaults.coach}}" placeholder="绿洲教练" bindinput="inputDefault" data-field="coach" />
+      </view>
+      <view class="field">
+        <text class="field-label">默认课程</text>
+        <input value="{{defaults.productName}}" placeholder="20次卡" bindinput="inputDefault" data-field="productName" />
+      </view>
+      <view class="field">
+        <text class="field-label">默认课时</text>
+        <input type="number" value="{{defaults.totalLessons}}" placeholder="20" bindinput="inputDefault" data-field="totalLessons" />
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">粘贴名单</view>
+    <view class="meta import-tip">每行一个学员。推荐格式：姓名 手机 校区 教练 总课时。只填姓名也可以。</view>
+    <textarea value="{{rawText}}" placeholder="白卓可 13800000000 绿洲 绿洲教练 26&#10;白卓冉&#10;饼饼 古北 古北教练 20" bindinput="inputRaw" />
+    <view class="toolbar">
+      <button class="primary" bindtap="preview">预览名单</button>
+      <button bindtap="fillSample">示例</button>
+      <button bindtap="clear">清空</button>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{rows.length}}">
+    <view class="row card-head">
+      <view class="card-title">预览 {{rows.length}} 人</view>
+      <button class="primary mini" bindtap="importRows">确认导入</button>
+    </view>
+    <view class="list-item" wx:for="{{rows}}" wx:key="index">
+      <view>
+        <view class="name">{{item.chineseName}}</view>
+        <view class="meta">{{item.phone || '无手机号'}} · {{item.campus}} · {{item.coach}} · {{item.totalLessons}} 课时</view>
+      </view>
+    </view>
+  </view>
+</view>

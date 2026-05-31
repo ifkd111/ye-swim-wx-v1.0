@@ -56,6 +56,12 @@ textarea {
   margin-bottom: 14rpx;
 }
 
+.link-text {
+  color: #67e8f9;
+  font-size: 24rpx;
+  font-weight: 800;
+}
+
 .grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -67,6 +73,17 @@ textarea {
   border-radius: 12rpx;
   background: #101f34;
   border: 1rpx solid #1d314d;
+}
+
+.tappable {
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+
+.tappable:active,
+.nav-card:active,
+.list-item:active {
+  opacity: 0.78;
+  transform: scale(0.99);
 }
 
 .metric-value {
@@ -160,6 +177,12 @@ button.primary {
   color: #04201e;
 }
 
+button.mini {
+  min-height: 62rpx;
+  padding: 0 22rpx;
+  font-size: 24rpx;
+}
+
 button.danger {
   background: #451722;
   border-color: #6f2638;
@@ -195,6 +218,16 @@ textarea {
   margin-bottom: 10rpx;
   color: #bdd0e8;
   font-size: 24rpx;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16rpx;
+}
+
+.form-grid .field {
+  margin-bottom: 0;
 }
 
 .nav-list {

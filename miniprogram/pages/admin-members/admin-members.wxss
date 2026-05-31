@@ -1,3 +1,23 @@
 .name {
   max-width: 420rpx;
 }
+
+.quick-toolbar {
+  margin: 0 0 20rpx;
+}
+
+.notes-field {
+  margin-top: 18rpx;
+}
+
+.card button.primary {
+  width: 100%;
+  margin-top: 8rpx;
+}
+
+.right-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12rpx;
+}

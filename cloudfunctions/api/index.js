@@ -23,8 +23,15 @@ function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(String(password), salt, 120000, 32, "sha256").toString("hex");
 }
 
+function withId(doc) {
+  if (!doc) return doc;
+  const result = Object.assign({}, doc);
+  if (!result.id && result._id) result.id = result._id;
+  return result;
+}
+
 function safeAccount(account) {
-  const result = Object.assign({}, account);
+  const result = withId(account);
   delete result.passwordHash;
   delete result.passwordSalt;
   return result;
@@ -112,7 +119,8 @@ async function schedulesFor(viewer) {
   let query = {};
   if (viewer.role === "coach") query = { coach: viewer.coachName };
   if (viewer.role === "student") query = { memberId: viewer.memberId };
-  return list("schedules", query, 1500);
+  const schedules = await list("schedules", query, 1500);
+  return schedules.map(withId);
 }
 
 async function availabilityFor(viewer) {
@@ -126,7 +134,8 @@ async function availabilityFor(viewer) {
     };
     if (member && member.coach) query.coach = member.coach;
   }
-  return list("availabilitySlots", query, 1000);
+  const slots = await list("availabilitySlots", query, 1000);
+  return slots.map(withId);
 }
 
 async function getHomeData(viewer) {
@@ -146,11 +155,11 @@ async function getHomeData(viewer) {
     viewer: safeAccount(viewer),
     members,
     schedules,
-    attendanceLogs,
+    attendanceLogs: attendanceLogs.map(withId),
     availabilitySlots,
-    bookingRequests,
-    courseApplications,
-    courseProducts,
+    bookingRequests: bookingRequests.map(withId),
+    courseApplications: courseApplications.map(withId),
+    courseProducts: courseProducts.map(withId),
     accounts: accounts.map(safeAccount)
   };
 }
@@ -184,6 +193,145 @@ async function createBookingRequest(viewer, payload) {
   };
   const result = await db.collection("bookingRequests").add({ data: request });
   return { message: "预约申请已提交，等待管理员审批", request: Object.assign({ id: result._id }, request) };
+}
+
+async function maxMemberNo() {
+  const members = await list("members", {}, 2000);
+  return members.reduce((max, member) => Math.max(max, Number(member.memberNo || 0)), 0);
+}
+
+async function productDefaults(payload, current) {
+  const productName = String(payload.productName || current && current.productName || "20次卡").trim();
+  const lessons = Number(payload.totalLessons || current && current.totalLessons || 20);
+  const products = await list("courseProducts", {}, 200);
+  const product =
+    products.find((item) => item.name === productName) ||
+    products.find((item) => item.type === payload.productType) ||
+    products[0] ||
+    {};
+  return {
+    productId: payload.productId || current && current.productId || product._id || "product-class-pack",
+    productName: productName || product.name || "20次卡",
+    productType: payload.productType || current && current.productType || product.type || "class_pack",
+    totalLessons: Number.isFinite(lessons) ? lessons : Number(product.totalLessons || 20)
+  };
+}
+
+async function memberPayload(payload, current) {
+  const raw = payload.member || payload;
+  const product = await productDefaults(raw, current);
+  return Object.assign({}, current || {}, product, {
+    chineseName: String(raw.chineseName || current && current.chineseName || "").trim(),
+    phone: String(raw.phone || "").trim(),
+    wechat: String(raw.wechat || current && current.wechat || "").trim(),
+    campus: String(raw.campus || current && current.campus || "").trim(),
+    coach: String(raw.coach || current && current.coach || "").trim(),
+    cardExpireDate: String(raw.cardExpireDate || current && current.cardExpireDate || "").trim(),
+    notes: String(raw.notes || "").trim(),
+    updatedAt: nowIso()
+  });
+}
+
+async function saveMember(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const raw = payload.member || payload;
+  const id = String(raw.id || raw._id || "").trim();
+  const current = id ? (await list("members", { _id: id }, 1))[0] : null;
+  const member = await memberPayload(raw, current);
+  if (!member.chineseName) throw new Error("学员姓名不能为空");
+
+  if (current) {
+    delete member._id;
+    await db.collection("members").doc(id).update({ data: member });
+    return { message: "学员已保存", member: withId(Object.assign({}, current, member)) };
+  }
+
+  member.memberNo = (await maxMemberNo()) + 1;
+  member.createdAt = nowIso();
+  const result = await db.collection("members").add({ data: member });
+  return { message: "学员已新增", member: Object.assign({ id: result._id }, member) };
+}
+
+async function bulkImportMembers(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  let nextNo = (await maxMemberNo()) + 1;
+  let created = 0;
+  let updated = 0;
+  let skipped = 0;
+
+  for (const row of rows) {
+    const name = String(row.chineseName || "").trim();
+    if (!name) {
+      skipped += 1;
+      continue;
+    }
+    const existing = await list("members", { chineseName: name }, 10);
+    const current = existing.find((member) => !row.phone || member.phone === row.phone) || null;
+    const member = await memberPayload(row, current);
+    if (current) {
+      delete member._id;
+      await db.collection("members").doc(current._id).update({ data: member });
+      updated += 1;
+      continue;
+    }
+    member.memberNo = nextNo;
+    nextNo += 1;
+    member.createdAt = nowIso();
+    await db.collection("members").add({ data: member });
+    created += 1;
+  }
+
+  return { message: "已导入：新增 " + created + "，更新 " + updated + "，跳过 " + skipped, created, updated, skipped };
+}
+
+async function saveAccount(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const raw = payload.account || payload;
+  const accountName = rules.normalizeAccount(raw.account);
+  const role = rules.roleFromAccount(accountName);
+  if (!role) throw new Error("账号必须是 admin、jl 开头或 xy 开头");
+
+  const id = String(raw.id || raw._id || "").trim();
+  const current = id ? (await list("accounts", { _id: id }, 1))[0] || null : null;
+  const duplicates = await list("accounts", { account: accountName }, 10);
+  if (duplicates.some((item) => item._id !== id)) throw new Error("账号已存在");
+
+  let memberId = raw.memberId || current && current.memberId || "";
+  if (role === "student") {
+    const memberName = String(raw.memberName || raw.fullName || "").trim();
+    const members = await list("members", memberId ? { _id: memberId } : { chineseName: memberName }, 10);
+    const member = members[0];
+    if (!member) throw new Error("学员账号需要填写已存在的学员姓名");
+    memberId = member._id;
+  }
+
+  const account = {
+    account: accountName,
+    role,
+    fullName: String(raw.fullName || raw.memberName || raw.coachName || accountName).trim(),
+    campus: String(raw.campus || current && current.campus || "").trim(),
+    coachName: role === "coach" ? String(raw.coachName || raw.fullName || "").trim() : "",
+    memberId: role === "student" ? memberId : "",
+    status: raw.status || current && current.status || "active",
+    updatedAt: nowIso()
+  };
+  if (role === "coach" && !account.coachName) throw new Error("教练账号需要填写教练名");
+
+  if (!current || raw.password) {
+    account.passwordSalt = crypto.randomBytes(16).toString("hex");
+    account.passwordHash = hashPassword(String(raw.password || "1324"), account.passwordSalt);
+  }
+
+  if (current) {
+    await db.collection("accounts").doc(current._id).update({ data: account });
+    return { message: "账号已保存", account: safeAccount(Object.assign({}, current, account)) };
+  }
+
+  account.openid = null;
+  account.createdAt = nowIso();
+  const result = await db.collection("accounts").add({ data: account });
+  return { message: "账号已新增", account: safeAccount(Object.assign({ _id: result._id }, account)) };
 }
 
 async function approveBookingRequest(viewer, payload) {
@@ -354,6 +502,9 @@ exports.main = async (event) => {
 
     const actions = {
       getHomeData,
+      saveMember,
+      bulkImportMembers,
+      saveAccount,
       createBookingRequest,
       approveBookingRequest,
       rejectBookingRequest,

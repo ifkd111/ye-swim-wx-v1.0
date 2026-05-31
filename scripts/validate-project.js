@@ -41,6 +41,9 @@ function main() {
   [
     "login",
     "getHomeData",
+    "saveMember",
+    "bulkImportMembers",
+    "saveAccount",
     "createBookingRequest",
     "approveBookingRequest",
     "rejectBookingRequest",

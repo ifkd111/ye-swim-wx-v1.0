@@ -5,6 +5,7 @@
     "pages/admin-bookings/admin-bookings",
     "pages/admin-schedule/admin-schedule",
     "pages/admin-members/admin-members",
+    "pages/admin-import/admin-import",
     "pages/admin-availability/admin-availability",
     "pages/admin-staff/admin-staff",
     "pages/coach/coach",

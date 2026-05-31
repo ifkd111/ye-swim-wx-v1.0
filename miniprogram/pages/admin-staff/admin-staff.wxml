@@ -2,20 +2,56 @@
   <view class="topbar">
     <view>
       <view class="title">账号</view>
-      <view class="subtitle">admin / jl / xy 统一登录口</view>
+      <view class="subtitle">admin / jl / xy 自动分工</view>
     </view>
+    <button class="primary mini" bindtap="resetForm">新增</button>
+  </view>
+
+  <view class="card">
+    <view class="card-title">{{form.id ? '修改账号' : '新增账号'}}</view>
+    <view class="form-grid">
+      <view class="field">
+        <text class="field-label">账号</text>
+        <input value="{{form.account}}" placeholder="jl002 / xy002" bindinput="input" data-field="account" />
+      </view>
+      <view class="field">
+        <text class="field-label">密码</text>
+        <input password value="{{form.password}}" placeholder="新建默认 1324，修改留空" bindinput="input" data-field="password" />
+      </view>
+      <view class="field">
+        <text class="field-label">备注名</text>
+        <input value="{{form.fullName}}" placeholder="教练名或学员名" bindinput="input" data-field="fullName" />
+      </view>
+      <view class="field">
+        <text class="field-label">校区</text>
+        <input value="{{form.campus}}" placeholder="绿洲" bindinput="input" data-field="campus" />
+      </view>
+      <view class="field">
+        <text class="field-label">教练名</text>
+        <input value="{{form.coachName}}" placeholder="jl 账号填写" bindinput="input" data-field="coachName" />
+      </view>
+      <view class="field">
+        <text class="field-label">绑定学员</text>
+        <input value="{{form.memberName}}" placeholder="xy 账号填写学员姓名" bindinput="input" data-field="memberName" />
+      </view>
+    </view>
+    <view class="role-hint">当前会进入：{{formRoleText}}</view>
+    <button class="primary" bindtap="saveAccount">保存账号</button>
   </view>
 
   <view class="card">
     <block wx:if="{{accounts.length}}">
-      <view class="list-item" wx:for="{{accounts}}" wx:key="id">
+      <view class="list-item tappable" wx:for="{{accounts}}" wx:key="id" bindtap="editAccount" data-id="{{item.id}}">
         <view class="row">
           <view>
             <view class="name">{{item.account}}</view>
-            <view class="meta">{{roleText[item.role]}} · {{item.fullName || item.coachName || item.memberId}}</view>
+            <view class="meta">{{roleText[item.role]}} · {{item.fullName || item.coachName || item.memberName || item.memberId}}</view>
             <view class="meta" wx:if="{{item.openid}}">已绑定微信</view>
           </view>
-          <text class="badge">{{item.status === 'disabled' ? '停用' : '启用'}}</text>
+          <view class="right-stack">
+            <text class="badge">{{item.status === 'disabled' ? '停用' : '启用'}}</text>
+            <text class="link-text">编辑</text>
+          </view>
         </view>
       </view>
     </block>
