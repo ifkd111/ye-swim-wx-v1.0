@@ -1,0 +1,25 @@
+{
+  "pages": [
+    "pages/login/login",
+    "pages/admin/admin",
+    "pages/admin-bookings/admin-bookings",
+    "pages/admin-schedule/admin-schedule",
+    "pages/admin-members/admin-members",
+    "pages/admin-availability/admin-availability",
+    "pages/admin-staff/admin-staff",
+    "pages/coach/coach",
+    "pages/coach-availability/coach-availability",
+    "pages/student/student",
+    "pages/student-booking/student-booking",
+    "pages/student-records/student-records"
+  ],
+  "window": {
+    "navigationBarTitleText": "亦游泳",
+    "navigationBarBackgroundColor": "#07111f",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#07111f",
+    "backgroundTextStyle": "light"
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

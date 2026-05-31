@@ -1,0 +1,3 @@
+.card button {
+  width: 100%;
+}

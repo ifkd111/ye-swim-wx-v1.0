@@ -1,0 +1,46 @@
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+}
+
+.login-card {
+  width: 100%;
+  border: 1rpx solid #1e314d;
+  border-radius: 24rpx;
+  padding: 44rpx 34rpx;
+  background: #0c1728;
+  box-shadow: 0 30rpx 90rpx rgba(0, 0, 0, 0.28);
+}
+
+.mark {
+  width: 86rpx;
+  height: 86rpx;
+  border-radius: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #04201e;
+  font-weight: 900;
+  background: #14b8a6;
+  margin-bottom: 28rpx;
+}
+
+.login-button {
+  width: 100%;
+  margin-top: 22rpx;
+}
+
+.quick {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 18rpx;
+}
+
+.quick button {
+  min-height: 64rpx;
+  padding: 0 12rpx;
+  font-size: 23rpx;
+}

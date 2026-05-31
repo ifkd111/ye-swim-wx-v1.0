@@ -1,0 +1,24 @@
+<view class="page login-page">
+  <view class="login-card">
+    <view class="mark">YE</view>
+    <view class="title">亦游泳</view>
+    <view class="subtitle">账号首次登录会绑定当前微信，之后自动进入对应工作台。</view>
+
+    <view class="field">
+      <text class="field-label">账号</text>
+      <input value="{{account}}" placeholder="admin / jl001 / xy001" bindinput="onAccountInput" />
+    </view>
+    <view class="field">
+      <text class="field-label">密码</text>
+      <input password value="{{password}}" placeholder="默认 1324" bindinput="onPasswordInput" />
+    </view>
+
+    <button class="primary login-button" loading="{{loading}}" bindtap="login">登录并绑定微信</button>
+
+    <view class="quick">
+      <button data-account="admin" bindtap="quickLogin">管理员</button>
+      <button data-account="jl001" bindtap="quickLogin">教练</button>
+      <button data-account="xy001" bindtap="quickLogin">学员</button>
+    </view>
+  </view>
+</view>

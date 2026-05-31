@@ -1,0 +1,24 @@
+<view class="page">
+  <view class="topbar">
+    <view>
+      <view class="title">学员</view>
+      <view class="subtitle">课时、校区、教练和状态</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <block wx:if="{{members.length}}">
+      <view class="list-item" wx:for="{{members}}" wx:key="id">
+        <view class="row">
+          <view>
+            <view class="name">{{item.chineseName}}</view>
+            <view class="meta">#{{item.memberNo}} · {{item.campus}} · {{item.coach}}</view>
+            <view class="meta">{{item.productName}} · 总 {{item.totalLessons}} / 已消 {{item.usedLessons}} / 剩余 {{item.remainingLessons}}</view>
+          </view>
+          <text class="badge {{item.status === '欠课' ? 'danger' : item.status === '即将用完' ? 'warn' : ''}}">{{item.status}}</text>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty">暂无学员</view>
+  </view>
+</view>

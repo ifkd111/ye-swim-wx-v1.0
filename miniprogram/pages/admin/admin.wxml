@@ -1,0 +1,70 @@
+<view class="page">
+  <view class="topbar">
+    <view>
+      <view class="title">老板工作台</view>
+      <view class="subtitle">预约审批、排课、学员与账号</view>
+    </view>
+    <button bindtap="logout">退出</button>
+  </view>
+
+  <view class="grid">
+    <view class="metric">
+      <text class="metric-value">{{stats.pendingBookings}}</text>
+      <text class="metric-label">待审批预约</text>
+    </view>
+    <view class="metric">
+      <text class="metric-value">{{stats.todaySchedules}}</text>
+      <text class="metric-label">今日课程</text>
+    </view>
+    <view class="metric">
+      <text class="metric-value">{{stats.members}}</text>
+      <text class="metric-label">学员</text>
+    </view>
+    <view class="metric">
+      <text class="metric-value">{{stats.coaches}}</text>
+      <text class="metric-label">教练账号</text>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">常用功能</view>
+    <view class="nav-list">
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
+        <text class="nav-title">预约审批</text>
+        <text class="nav-meta">通过后生成排课</text>
+      </view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-schedule/admin-schedule">
+        <text class="nav-title">排课</text>
+        <text class="nav-meta">特殊情况手动安排</text>
+      </view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-availability/admin-availability">
+        <text class="nav-title">空余时间</text>
+        <text class="nav-meta">控制教练名额</text>
+      </view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-members/admin-members">
+        <text class="nav-title">学员</text>
+        <text class="nav-meta">课时与状态</text>
+      </view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-staff/admin-staff">
+        <text class="nav-title">账号</text>
+        <text class="nav-meta">admin / jl / xy</text>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">最新预约</view>
+    <block wx:if="{{pendingBookings.length}}">
+      <view class="list-item" wx:for="{{pendingBookings}}" wx:key="id">
+        <view class="row">
+          <view>
+            <view class="name">{{item.memberName}}</view>
+            <view class="meta">{{item.slotDate}} {{item.slotTime}} · {{item.coach}}</view>
+          </view>
+          <text class="badge warn">待审批</text>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty">暂无待审批预约</view>
+  </view>
+</view>

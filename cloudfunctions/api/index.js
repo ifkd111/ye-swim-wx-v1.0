@@ -1,0 +1,372 @@
+const cloud = require("wx-server-sdk");
+const crypto = require("crypto");
+const rules = require("./rules");
+
+cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
+
+const db = cloud.database();
+const _ = db.command;
+
+function ok(data) {
+  return { ok: true, data };
+}
+
+function fail(error) {
+  return { ok: false, message: error && error.message ? error.message : "操作失败" };
+}
+
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function hashPassword(password, salt) {
+  return crypto.pbkdf2Sync(String(password), salt, 120000, 32, "sha256").toString("hex");
+}
+
+function safeAccount(account) {
+  const result = Object.assign({}, account);
+  delete result.passwordHash;
+  delete result.passwordSalt;
+  return result;
+}
+
+async function getAccountByName(accountName) {
+  const result = await db.collection("accounts").where({
+    account: rules.normalizeAccount(accountName),
+    status: _.neq("disabled")
+  }).limit(1).get();
+  return result.data[0] || null;
+}
+
+async function getAccountBySession(session, wxContext) {
+  if (!session || !session.account) return null;
+  const account = await getAccountByName(session.account);
+  if (!account) return null;
+  if (account.openid && account.openid !== wxContext.OPENID) return null;
+  return account;
+}
+
+function assertRole(viewer, roles) {
+  if (!viewer || roles.indexOf(viewer.role) === -1) {
+    throw new Error("没有权限执行该操作");
+  }
+}
+
+async function list(collection, query, limit) {
+  const result = await db.collection(collection).where(query || {}).limit(limit || 1000).get();
+  return result.data || [];
+}
+
+async function login(payload, wxContext) {
+  const accountName = rules.normalizeAccount(payload.account);
+  const account = await getAccountByName(accountName);
+  if (!account) throw new Error("账号或密码错误");
+
+  const hashed = hashPassword(payload.password || "", account.passwordSalt);
+  if (hashed !== account.passwordHash) throw new Error("账号或密码错误");
+
+  const role = rules.roleFromAccount(accountName);
+  if (!role || role !== account.role) throw new Error("账号角色配置不正确");
+  if (account.openid && account.openid !== wxContext.OPENID) throw new Error("该账号已经绑定其他微信");
+
+  await db.collection("accounts").doc(account._id).update({
+    data: {
+      openid: wxContext.OPENID,
+      lastLoginAt: nowIso(),
+      updatedAt: nowIso()
+    }
+  });
+
+  return {
+    session: safeAccount(Object.assign({}, account, { openid: wxContext.OPENID })),
+    message: "登录成功，已绑定当前微信"
+  };
+}
+
+async function memberViews(viewer) {
+  let memberQuery = {};
+  if (viewer.role === "coach") memberQuery = { coach: viewer.coachName };
+  if (viewer.role === "student") memberQuery = { _id: viewer.memberId };
+
+  const [members, attendanceLogs] = await Promise.all([
+    list("members", memberQuery, 1500),
+    list("attendanceLogs", viewer.role === "student" ? { memberId: viewer.memberId } : {}, 1500)
+  ]);
+  const usedByMember = {};
+  attendanceLogs.forEach((log) => {
+    usedByMember[log.memberId] = (usedByMember[log.memberId] || 0) + Number(log.lessonsDeducted || 0);
+  });
+
+  return members.map((member) => {
+    const balance = rules.memberStatus(member, usedByMember[member._id] || 0);
+    return Object.assign({}, member, {
+      id: member._id,
+      usedLessons: usedByMember[member._id] || 0,
+      remainingLessons: balance.remaining,
+      status: balance.status
+    });
+  });
+}
+
+async function schedulesFor(viewer) {
+  let query = {};
+  if (viewer.role === "coach") query = { coach: viewer.coachName };
+  if (viewer.role === "student") query = { memberId: viewer.memberId };
+  return list("schedules", query, 1500);
+}
+
+async function availabilityFor(viewer) {
+  let query = {};
+  if (viewer.role === "coach") query = { coach: viewer.coachName };
+  if (viewer.role === "student") {
+    const member = (await list("members", { _id: viewer.memberId }, 1))[0];
+    query = {
+      status: "published",
+      slotDate: _.gte(rules.minStudentBookingDate())
+    };
+    if (member && member.coach) query.coach = member.coach;
+  }
+  return list("availabilitySlots", query, 1000);
+}
+
+async function getHomeData(viewer) {
+  const [members, schedules, attendanceLogs, availabilitySlots, bookingRequests, courseApplications, courseProducts, accounts] =
+    await Promise.all([
+      memberViews(viewer),
+      schedulesFor(viewer),
+      list("attendanceLogs", viewer.role === "student" ? { memberId: viewer.memberId } : viewer.role === "coach" ? { coach: viewer.coachName } : {}, 1500),
+      availabilityFor(viewer),
+      list("bookingRequests", viewer.role === "student" ? { memberId: viewer.memberId } : viewer.role === "coach" ? { coach: viewer.coachName } : {}, 1000),
+      list("courseApplications", viewer.role === "student" ? { memberId: viewer.memberId } : {}, 1000),
+      list("courseProducts", {}, 200),
+      viewer.role === "admin" ? list("accounts", {}, 1000) : []
+    ]);
+
+  return {
+    viewer: safeAccount(viewer),
+    members,
+    schedules,
+    attendanceLogs,
+    availabilitySlots,
+    bookingRequests,
+    courseApplications,
+    courseProducts,
+    accounts: accounts.map(safeAccount)
+  };
+}
+
+async function createBookingRequest(viewer, payload) {
+  assertRole(viewer, ["student"]);
+  const slot = (await list("availabilitySlots", { _id: payload.slotId }, 1))[0];
+  if (!slot || slot.status !== "published") throw new Error("该时间暂不可预约");
+  if (!rules.isBookableForStudent(slot.slotDate)) throw new Error("该时间不符合提前预约规则");
+
+  const member = (await list("members", { _id: viewer.memberId }, 1))[0];
+  if (!member) throw new Error("找不到绑定学员");
+  if (member.coach && member.coach !== slot.coach) throw new Error("该时间不属于你的绑定教练");
+
+  const active = await list("bookingRequests", { slotId: slot._id, status: _.in(["pending", "approved"]) }, 100);
+  if (active.length >= Number(slot.capacity || 1)) throw new Error("该时间名额已满");
+  if (active.some((item) => item.memberId === viewer.memberId)) throw new Error("你已经提交过该时间的预约");
+
+  const request = {
+    slotId: slot._id,
+    memberId: member._id,
+    memberName: member.chineseName,
+    slotDate: slot.slotDate,
+    slotTime: slot.slotTime,
+    campus: slot.campus,
+    coach: slot.coach,
+    status: "pending",
+    note: String(payload.note || "").trim(),
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  const result = await db.collection("bookingRequests").add({ data: request });
+  return { message: "预约申请已提交，等待管理员审批", request: Object.assign({ id: result._id }, request) };
+}
+
+async function approveBookingRequest(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const request = (await list("bookingRequests", { _id: payload.requestId }, 1))[0];
+  if (!request || request.status !== "pending") throw new Error("该预约无法审批");
+  const slot = (await list("availabilitySlots", { _id: request.slotId }, 1))[0];
+  if (!slot) throw new Error("空余时间不存在");
+
+  const schedule = {
+    lessonDate: slot.slotDate,
+    lessonTime: slot.slotTime,
+    campus: slot.campus,
+    coach: slot.coach,
+    memberId: request.memberId,
+    memberName: request.memberName,
+    attended: false,
+    lessonStatus: "pending",
+    source: "student_booking",
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  const result = await db.collection("schedules").add({ data: schedule });
+  await db.collection("bookingRequests").doc(request._id).update({
+    data: {
+      status: "approved",
+      reviewedAt: nowIso(),
+      reviewedBy: viewer.account,
+      createdScheduleId: result._id,
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "已通过预约并生成排课", schedule: Object.assign({ id: result._id }, schedule) };
+}
+
+async function rejectBookingRequest(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  await db.collection("bookingRequests").doc(payload.requestId).update({
+    data: {
+      status: "rejected",
+      reviewedAt: nowIso(),
+      reviewedBy: viewer.account,
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "已拒绝预约" };
+}
+
+async function markAttendance(viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const schedule = (await list("schedules", { _id: payload.scheduleId }, 1))[0];
+  if (!schedule) throw new Error("排课不存在");
+  if (viewer.role === "coach" && schedule.coach !== viewer.coachName) throw new Error("只能确认自己的课程");
+  if (schedule.lessonStatus === "completed") return { message: "该课程已经确认过出勤", schedule };
+
+  const existing = await list("attendanceLogs", { sourceScheduleId: schedule._id }, 1);
+  if (existing.length) {
+    await db.collection("schedules").doc(schedule._id).update({ data: { attended: true, lessonStatus: "completed", updatedAt: nowIso() } });
+    return { message: "该课程已经有消课记录，已同步为完成" };
+  }
+
+  const member = (await list("members", { _id: schedule.memberId }, 1))[0];
+  if (!member) throw new Error("学员不存在");
+  const log = {
+    attendanceDate: schedule.lessonDate,
+    memberId: member._id,
+    memberName: member.chineseName,
+    coach: schedule.coach,
+    campus: schedule.campus,
+    lessonsDeducted: rules.lessonDeduction(member.productType),
+    sourceScheduleId: schedule._id,
+    source: "coach_checkin",
+    sourceNote: "小程序确认出勤",
+    createdAt: nowIso()
+  };
+  await db.collection("attendanceLogs").add({ data: log });
+  await db.collection("schedules").doc(schedule._id).update({ data: { attended: true, lessonStatus: "completed", updatedAt: nowIso() } });
+  return { message: log.lessonsDeducted ? "已确认出勤并扣 1 课时" : "已确认出勤，该课程类型不扣课时", log };
+}
+
+async function createAvailabilitySlot(viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const slot = {
+    slotDate: String(payload.slotDate || "").trim(),
+    slotTime: String(payload.slotTime || "").trim(),
+    campus: String(payload.campus || viewer.campus || "").trim(),
+    coach: viewer.role === "coach" ? viewer.coachName : String(payload.coach || "").trim(),
+    capacity: Math.max(1, Number(payload.capacity || 1)),
+    status: viewer.role === "admin" ? String(payload.status || "published") : "draft",
+    publishOrder: Number(payload.publishOrder || 100),
+    notes: String(payload.notes || "").trim(),
+    createdBy: viewer.account,
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  if (!slot.slotDate || !slot.slotTime || !slot.campus || !slot.coach) throw new Error("日期、时间、校区、教练不能为空");
+  const result = await db.collection("availabilitySlots").add({ data: slot });
+  return { message: viewer.role === "admin" ? "可预约时间已发布" : "空余时间已提交，等待管理员发布", slot: Object.assign({ id: result._id }, slot) };
+}
+
+async function publishAvailabilitySlot(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  await db.collection("availabilitySlots").doc(payload.slotId).update({
+    data: {
+      status: "published",
+      publishOrder: Number(payload.publishOrder || 100),
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "已发布可预约时间" };
+}
+
+async function createManualSchedule(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const memberName = String(payload.memberName || "").trim();
+  const members = await list("members", payload.memberId ? { _id: payload.memberId } : { chineseName: memberName }, 1);
+  const member = members[0];
+  if (!member) throw new Error("找不到学员，请检查姓名");
+  const schedule = {
+    lessonDate: String(payload.lessonDate || "").trim(),
+    lessonTime: String(payload.lessonTime || "").trim(),
+    campus: String(payload.campus || member.campus || "").trim(),
+    coach: String(payload.coach || member.coach || "").trim(),
+    memberId: member._id,
+    memberName: member.chineseName,
+    attended: false,
+    lessonStatus: "pending",
+    source: "manual_admin",
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  if (!schedule.lessonDate || !schedule.lessonTime || !schedule.campus || !schedule.coach) throw new Error("日期、时间、校区、教练不能为空");
+  const result = await db.collection("schedules").add({ data: schedule });
+  return { message: "管理员手动排课已创建", schedule: Object.assign({ id: result._id }, schedule) };
+}
+
+async function createCourseApplication(viewer, payload) {
+  assertRole(viewer, ["student"]);
+  const [member, product] = await Promise.all([
+    list("members", { _id: viewer.memberId }, 1),
+    list("courseProducts", { _id: payload.productId }, 1)
+  ]);
+  if (!member[0] || !product[0]) throw new Error("申请信息不完整");
+  const application = {
+    memberId: member[0]._id,
+    memberName: member[0].chineseName,
+    productId: product[0]._id,
+    productName: product[0].name,
+    status: "pending",
+    note: String(payload.note || "").trim(),
+    createdAt: nowIso(),
+    updatedAt: nowIso()
+  };
+  await db.collection("courseApplications").add({ data: application });
+  return { message: "课程申请已提交，等待管理员处理", application };
+}
+
+exports.main = async (event) => {
+  try {
+    const wxContext = cloud.getWXContext();
+    const action = event.action;
+    const payload = event.payload || {};
+
+    if (action === "login") return ok(await login(payload, wxContext));
+
+    const viewer = await getAccountBySession(payload.session, wxContext);
+    if (!viewer) throw new Error("登录已过期，请重新登录");
+
+    const actions = {
+      getHomeData,
+      createBookingRequest,
+      approveBookingRequest,
+      rejectBookingRequest,
+      markAttendance,
+      createAvailabilitySlot,
+      publishAvailabilitySlot,
+      createManualSchedule,
+      createCourseApplication
+    };
+
+    if (!actions[action]) throw new Error("未知操作：" + action);
+    return ok(await actions[action](viewer, payload));
+  } catch (error) {
+    return fail(error);
+  }
+};

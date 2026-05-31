@@ -1,0 +1,13 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+private.key
+*.private.key
+cloudbase.seed.json
+miniprogram/private.config.json
+miniprogram/miniprogram_npm/
+*.log
+.DS_Store
+Thumbs.db
