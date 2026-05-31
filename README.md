@@ -34,6 +34,10 @@ npm run seed:export
 
 看 [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)。
 
+## 本机工具状态
+
+看 [docs/LOCAL_TOOLS.md](docs/LOCAL_TOOLS.md)。
+
 ## 版本记录
 
 看 [docs/RELEASES.md](docs/RELEASES.md)。
