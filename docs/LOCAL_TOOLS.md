@@ -13,7 +13,8 @@
 当前状态：
 
 - 已安装：`gh version 2.93.0`
-- 未登录：需要运行 `gh auth login`
+- 已登录：`ifkd111`
+- 权限包含：`repo`、`workflow`、`read:org`
 
 登录方法：
 
@@ -27,9 +28,9 @@ gh auth login
 - HTTPS
 - Login with a web browser
 
-登录完成后，Codex 就可以直接使用 `gh repo create`、`gh repo view` 等命令。
+登录完成后，Codex 可以直接使用 `gh repo create`、`gh repo view` 等命令。
 
-本项目这次已经不用等 `gh`：仓库 `ifkd111/ye-swim-wx-v1.0` 已创建并推送完成。
+本项目仓库：`https://github.com/ifkd111/ye-swim-wx-v1.0`
 
 ## 微信开发者工具
 
@@ -50,11 +51,13 @@ C:\Program Files (x86)\Tencent\微信web开发者工具
 ```powershell
 & 'C:\Program Files (x86)\Tencent\微信web开发者工具\cli.bat' open --project 'D:\课表\ye-swim-wx-v1.0'
 & 'C:\Program Files (x86)\Tencent\微信web开发者工具\cli.bat' preview --project 'D:\课表\ye-swim-wx-v1.0'
-& 'C:\Program Files (x86)\Tencent\微信web开发者工具\cli.bat' upload --project 'D:\课表\ye-swim-wx-v1.0' -v 1.0.0 -d 'ye-swim 微信小程序 v1.0'
+& 'C:\Program Files (x86)\Tencent\微信web开发者工具\cli.bat' upload --project 'D:\课表\ye-swim-wx-v1.0' -v 1.0.0 -d '叶 微信小程序 v1.0'
 ```
 
 注意：
 
-- 当前 CLI 能响应，但 `open` 报 `listen EACCES: permission denied 127.0.0.1:3799`。
-- 需要先在微信开发者工具图形界面里开启“服务端口/命令行自动化”。
-- 开启后 Codex 可以继续用 CLI 打开、预览和上传项目。
+- 图形界面已经开启“服务端口/命令行自动化”。
+- 当前服务端口：`32271`。
+- `cli.bat` 当前版本仍会尝试占用默认 `127.0.0.1:3799`，所以自动化优先使用 HTTP 接口。
+- Codex 已验证可以通过 `http://127.0.0.1:32271/open?projectpath=...` 打开项目。
+- 预览二维码需要真实小程序 AppID；当前 `touristappid` 可用于本地开发，但预览会报 `appid missing`。

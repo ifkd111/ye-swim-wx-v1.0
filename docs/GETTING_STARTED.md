@@ -27,7 +27,7 @@ npm run seed:export
 1. 打开微信开发者工具。
 2. 选择“导入项目”。
 3. 项目目录选择：`D:\课表\ye-swim-wx-v1.0`。
-4. AppID 当前是 `touristappid`，可先用于本地预览；正式上传前再替换真实 AppID。
+4. AppID 当前是 `touristappid`，可先用于开发者工具本地打开；正式预览/上传前再替换真实 AppID。
 5. 先保持 `miniprogram/env.js` 里的 `useMock: true`，这样不需要云环境也能看流程。
 
 ## 接入真实云开发

@@ -22,13 +22,6 @@ Page({
     this.setData({ password: event.detail.value });
   },
 
-  quickLogin(event) {
-    this.setData({
-      account: event.currentTarget.dataset.account,
-      password: "1324"
-    });
-  },
-
   login() {
     if (this.data.loading) return;
     this.setData({ loading: true });
