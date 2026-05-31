@@ -8,7 +8,7 @@
 
   <view class="card">
     <view class="card-title">一句话生成</view>
-    <textarea value="{{phrase}}" placeholder="比如：明天下午有空&#10;每周三下午有空&#10;每周四上午8点到9点可以上课" bindinput="phraseInput" />
+    <textarea value="{{phrase}}" placeholder="比如：明天下午有空&#10;下周每天下午有空&#10;每周几几点到几点可以上课" bindinput="phraseInput" />
     <view class="toolbar">
       <button class="primary" bindtap="parsePhrase">生成预览</button>
       <button bindtap="clearPreview">清空</button>
@@ -16,15 +16,38 @@
   </view>
 
   <view class="card">
-    <view class="card-title">常用按钮</view>
-    <view class="chip-list">
-      <view class="chip" bindtap="quick" data-mode="tomorrow-afternoon">明天下午</view>
-      <view class="chip" bindtap="quick" data-mode="tomorrow-all">明天全天</view>
-      <view class="chip" bindtap="quick" data-mode="next-week-afternoon">下周每天下午</view>
-      <view class="chip" bindtap="quick" data-mode="weekly-wed-afternoon">每周三下午</view>
-      <view class="chip" bindtap="quick" data-mode="weekly-thu-morning-8">每周四 8-9点</view>
-      <view class="chip" bindtap="copyWeek">复制本周到下周</view>
+    <view class="row card-head">
+      <view>
+        <view class="card-title">常用模板</view>
+        <view class="meta">每个教练可按自己的习惯修改</view>
+      </view>
+      <button class="mini" bindtap="toggleTemplateEdit">{{templateEditing ? '完成' : '编辑'}}</button>
     </view>
+    <block wx:if="{{!templateEditing}}">
+      <view class="chip-list">
+        <view class="chip" wx:for="{{templates}}" wx:key="id" bindtap="applyTemplate" data-index="{{index}}">{{item.label}}</view>
+      </view>
+      <button class="utility-button" bindtap="copyWeek">复制本周到下周</button>
+    </block>
+    <block wx:else>
+      <view class="template-row" wx:for="{{templates}}" wx:key="id">
+        <view class="template-fields">
+          <input value="{{item.label}}" placeholder="按钮名" bindinput="templateInput" data-index="{{index}}" data-field="label" />
+          <input value="{{item.phrase}}" placeholder="例如：明天下午有空" bindinput="templateInput" data-index="{{index}}" data-field="phrase" />
+        </view>
+        <view class="template-actions">
+          <button class="mini primary" bindtap="applyTemplate" data-index="{{index}}">试用</button>
+          <button class="mini danger" bindtap="removeTemplate" data-index="{{index}}">删除</button>
+        </view>
+      </view>
+      <view class="template-row add-template">
+        <view class="template-fields">
+          <input value="{{newTemplate.label}}" placeholder="新按钮名" bindinput="newTemplateInput" data-field="label" />
+          <input value="{{newTemplate.phrase}}" placeholder="一句话规则" bindinput="newTemplateInput" data-field="phrase" />
+        </view>
+        <button class="mini primary" bindtap="addTemplate">添加</button>
+      </view>
+    </block>
   </view>
 
   <view class="card">

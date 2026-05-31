@@ -2,24 +2,24 @@
   <view class="topbar">
     <view>
       <view class="title">我的记录</view>
-      <view class="subtitle">排课、出勤、预约和课程申请</view>
+      <view class="subtitle">先看消课，什么时候、哪个教练扣的都在这里</view>
     </view>
   </view>
 
   <view class="card">
-    <view class="card-title">出勤记录</view>
+    <view class="card-title">消课记录</view>
     <block wx:if="{{attendanceLogs.length}}">
       <view class="list-item" wx:for="{{attendanceLogs}}" wx:key="id">
         <view class="row">
           <view>
             <view class="name">{{item.attendanceDate}}</view>
-            <view class="meta">{{item.coach}} · {{item.campus}}</view>
+            <view class="meta">{{item.coach}} · {{item.campus}} · {{item.sourceNote || '教练确认出勤'}}</view>
           </view>
           <text class="badge">扣 {{item.lessonsDeducted}}</text>
         </view>
       </view>
     </block>
-    <view wx:else class="empty">暂无出勤记录</view>
+    <view wx:else class="empty">暂无消课记录</view>
   </view>
 
   <view class="card">

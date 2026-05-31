@@ -1,10 +1,35 @@
 const api = require("../../utils/api");
+const rules = require("../../utils/rules");
+
+function toDate(value) {
+  return new Date(String(value) + "T00:00:00");
+}
+
+function daysFromToday(value) {
+  const today = toDate(rules.formatDateChina(new Date()));
+  return Math.floor((toDate(value) - today) / 86400000);
+}
+
+function dayLabel(value) {
+  const diff = daysFromToday(value);
+  if (diff === 0) return "今天";
+  if (diff === 1) return "明天";
+  if (diff === 2) return "后天";
+  return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][toDate(value).getDay()];
+}
+
+function decorateSchedule(item) {
+  return Object.assign({}, item, {
+    dayLabel: dayLabel(item.lessonDate),
+    diff: daysFromToday(item.lessonDate)
+  });
+}
 
 Page({
   data: {
     viewer: {},
     member: {},
-    schedules: [],
+    weekSchedules: [],
     bookingRequests: [],
     courseProducts: [],
     courseNote: ""
@@ -17,10 +42,14 @@ Page({
 
   load() {
     api.call("getHomeData").then((data) => {
+      const schedules = (data.schedules || [])
+        .map(decorateSchedule)
+        .sort((a, b) => (a.lessonDate + a.lessonTime).localeCompare(b.lessonDate + b.lessonTime));
+      const weekSchedules = schedules.filter((item) => item.diff >= 0 && item.diff <= 6);
       this.setData({
         viewer: data.viewer,
         member: (data.members || [])[0] || {},
-        schedules: (data.schedules || []).slice(0, 5),
+        weekSchedules: weekSchedules.slice(0, 8),
         bookingRequests: data.bookingRequests || [],
         courseProducts: data.courseProducts || []
       });
@@ -36,7 +65,7 @@ Page({
   },
 
   goRecords() {
-    wx.navigateTo({ url: "/pages/student-records/student-records" });
+    wx.navigateTo({ url: "/pages/student-records/student-records?focus=attendance" });
   },
 
   applyCourse() {

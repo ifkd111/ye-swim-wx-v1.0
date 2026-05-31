@@ -30,6 +30,50 @@
   margin-bottom: 8rpx;
 }
 
+.card-head button.mini {
+  width: auto;
+  flex-shrink: 0;
+}
+
 .list-item button.mini {
   width: auto;
+}
+
+.utility-button {
+  margin-top: 16rpx;
+}
+
+.template-row {
+  padding: 18rpx 0;
+  border-top: 1rpx solid #17263d;
+}
+
+.template-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.template-fields {
+  display: grid;
+  grid-template-columns: 180rpx minmax(0, 1fr);
+  gap: 12rpx;
+}
+
+.template-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12rpx;
+  margin-top: 12rpx;
+}
+
+.template-actions button,
+.add-template button {
+  width: 100%;
+}
+
+.add-template {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 140rpx;
+  gap: 12rpx;
+  align-items: center;
 }

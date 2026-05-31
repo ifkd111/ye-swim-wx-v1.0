@@ -1,3 +1,16 @@
 .balance-grid {
   margin-top: 20rpx;
 }
+
+.action-metric {
+  border-color: #14b8a6;
+}
+
+.booking-button {
+  width: 100%;
+  margin-top: 18rpx;
+}
+
+.row button.mini {
+  flex-shrink: 0;
+}

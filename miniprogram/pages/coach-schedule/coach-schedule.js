@@ -18,20 +18,27 @@ function dayLabel(value) {
   return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][toDate(value).getDay()];
 }
 
-function decorateSchedule(item) {
+function decorate(item) {
   return Object.assign({}, item, {
     dayLabel: dayLabel(item.lessonDate),
-    canMark: item.lessonStatus !== "completed"
+    diff: daysFromToday(item.lessonDate)
   });
 }
 
 Page({
   data: {
-    viewer: {},
-    stats: {},
-    weekSchedules: [],
-    arrangedSchedules: [],
-    schedules: []
+    filter: "week",
+    schedules: [],
+    visibleSchedules: [],
+    stats: {
+      week: 0,
+      pending: 0,
+      all: 0
+    }
+  },
+
+  onLoad(options) {
+    if (options && options.filter) this.setData({ filter: options.filter });
   },
 
   onShow() {
@@ -42,25 +49,33 @@ Page({
   load() {
     api.call("getHomeData").then((data) => {
       const schedules = (data.schedules || [])
-        .map(decorateSchedule)
+        .map(decorate)
         .sort((a, b) => (a.lessonDate + a.lessonTime).localeCompare(b.lessonDate + b.lessonTime));
-      const weekSchedules = schedules.filter((item) => {
-        const diff = daysFromToday(item.lessonDate);
-        return diff >= 0 && diff <= 6;
-      });
-      const arrangedSchedules = schedules.filter((item) => daysFromToday(item.lessonDate) >= 0 && item.lessonStatus !== "completed");
       this.setData({
-        viewer: data.viewer,
-        schedules: schedules.slice(0, 50),
-        weekSchedules: weekSchedules.slice(0, 8),
-        arrangedSchedules: arrangedSchedules.slice(0, 8),
+        schedules,
         stats: {
+          week: schedules.filter((item) => item.diff >= 0 && item.diff <= 6).length,
           pending: schedules.filter((item) => item.lessonStatus !== "completed").length,
-          members: (data.members || []).length,
-          week: weekSchedules.length
+          all: schedules.length
         }
       });
+      this.applyFilter();
     });
+  },
+
+  setFilter(event) {
+    this.setData({ filter: event.currentTarget.dataset.filter });
+    this.applyFilter();
+  },
+
+  applyFilter() {
+    const visibleSchedules = this.data.schedules.filter((item) => {
+      if (this.data.filter === "week") return item.diff >= 0 && item.diff <= 6;
+      if (this.data.filter === "pending") return item.lessonStatus !== "completed";
+      if (this.data.filter === "completed") return item.lessonStatus === "completed";
+      return true;
+    });
+    this.setData({ visibleSchedules });
   },
 
   mark(event) {
@@ -72,23 +87,5 @@ Page({
         this.load();
       })
       .catch(api.fail);
-  },
-
-  goAvailability() {
-    wx.navigateTo({ url: "/pages/coach-availability/coach-availability" });
-  },
-
-  goSchedule(event) {
-    const filter = event && event.currentTarget.dataset.filter ? event.currentTarget.dataset.filter : "week";
-    wx.navigateTo({ url: "/pages/coach-schedule/coach-schedule?filter=" + filter });
-  },
-
-  goMembers() {
-    wx.navigateTo({ url: "/pages/coach-members/coach-members" });
-  },
-
-  logout() {
-    api.clearSession();
-    wx.reLaunch({ url: "/pages/login/login" });
   }
 });

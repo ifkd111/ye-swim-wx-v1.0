@@ -9,6 +9,8 @@
     "pages/admin-availability/admin-availability",
     "pages/admin-staff/admin-staff",
     "pages/coach/coach",
+    "pages/coach-schedule/coach-schedule",
+    "pages/coach-members/coach-members",
     "pages/coach-availability/coach-availability",
     "pages/student/student",
     "pages/student-booking/student-booking",

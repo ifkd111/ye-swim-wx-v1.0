@@ -1,3 +1,12 @@
 .grid {
   margin-bottom: 20rpx;
 }
+
+.wide-action {
+  width: 100%;
+  margin-top: 16rpx;
+}
+
+.row button.mini {
+  flex-shrink: 0;
+}

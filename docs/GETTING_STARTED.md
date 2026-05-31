@@ -38,7 +38,7 @@ npm run seed:export
 
 ```js
 module.exports = {
-  version: "1.0.3",
+  version: "1.0.4",
   envId: "你的云环境ID",
   useMock: false
 };

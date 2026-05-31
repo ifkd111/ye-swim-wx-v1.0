@@ -2,6 +2,7 @@ const api = require("../../utils/api");
 
 Page({
   data: {
+    focus: "attendance",
     attendanceLogs: [],
     courseApplications: [],
     statusText: {
@@ -9,6 +10,10 @@ Page({
       approved: "已通过",
       rejected: "已拒绝"
     }
+  },
+
+  onLoad(options) {
+    if (options && options.focus) this.setData({ focus: options.focus });
   },
 
   onShow() {
