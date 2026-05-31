@@ -27,7 +27,7 @@ npm run seed:export
 1. 打开微信开发者工具。
 2. 选择“导入项目”。
 3. 项目目录选择：`D:\课表\ye-swim-wx-v1.0`。
-4. AppID 当前是 `touristappid`，可先用于开发者工具本地打开；正式预览/上传前再替换真实 AppID。
+4. AppID 当前已配置为 `wx7f2d509804954eaf`。
 5. 先保持 `miniprogram/env.js` 里的 `useMock: true`，这样不需要云环境也能看流程。
 
 ## 接入真实云开发
@@ -49,12 +49,11 @@ module.exports = {
 
 ## 上传体验版
 
-真实 AppID 和上传密钥准备好后：
+代码上传密钥准备好后：
 
 ```powershell
-$env:WX_APPID="你的AppID"
-$env:WX_PRIVATE_KEY_PATH="D:\课表\ye-swim-wx-v1.0\private.key"
 npm run ci:preview
+npm run ci:upload -- 1.0.5 账号密码体系修复
 ```
 
-如果你不会做这一步，让 Codex/Hermes 提醒我接手即可。
+当前 `1.0.5` 开发版已经通过 `miniprogram-ci` 上传成功。正式上线还需要在微信公众平台设置体验版、提交审核并发布。
