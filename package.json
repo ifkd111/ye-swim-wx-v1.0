@@ -7,11 +7,13 @@
     "validate": "node scripts/validate-project.js",
     "test:rules": "node scripts/test-rules.js",
     "seed:export": "node scripts/export-seed-cloudbase.js",
-    "ci:preview": "node scripts/miniprogram-preview.js"
+    "ci:preview": "node scripts/miniprogram-ci.js preview",
+    "ci:upload": "node scripts/miniprogram-ci.js upload",
+    "ci:upload-function": "node scripts/miniprogram-ci.js upload-function",
+    "ci:quality": "node scripts/miniprogram-ci.js quality"
   },
   "dependencies": {
     "miniprogram-ci": "^2.1.31",
     "wx-server-sdk": "^3.0.4"
-  },
-  "devDependencies": {}
+  }
 }
