@@ -1,12 +1,72 @@
 <view class="page">
   <view class="topbar">
     <view>
-      <view class="title">提交空余</view>
-      <view class="subtitle">教练提交后默认是草稿，老板决定是否发布</view>
+      <view class="title">空余助手</view>
+      <view class="subtitle">说一句话或点快捷按钮，先预览再提交</view>
     </view>
   </view>
 
   <view class="card">
+    <view class="card-title">一句话生成</view>
+    <textarea value="{{phrase}}" placeholder="比如：明天下午有空&#10;每周三下午有空&#10;每周四上午8点到9点可以上课" bindinput="phraseInput" />
+    <view class="toolbar">
+      <button class="primary" bindtap="parsePhrase">生成预览</button>
+      <button bindtap="clearPreview">清空</button>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">常用按钮</view>
+    <view class="chip-list">
+      <view class="chip" bindtap="quick" data-mode="tomorrow-afternoon">明天下午</view>
+      <view class="chip" bindtap="quick" data-mode="tomorrow-all">明天全天</view>
+      <view class="chip" bindtap="quick" data-mode="next-week-afternoon">下周每天下午</view>
+      <view class="chip" bindtap="quick" data-mode="weekly-wed-afternoon">每周三下午</view>
+      <view class="chip" bindtap="quick" data-mode="weekly-thu-morning-8">每周四 8-9点</view>
+      <view class="chip" bindtap="copyWeek">复制本周到下周</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">记忆设置</view>
+    <view class="form-grid">
+      <view class="field">
+        <text class="field-label">默认校区</text>
+        <input value="{{settings.campus}}" placeholder="绿洲" bindinput="settingInput" data-field="campus" />
+      </view>
+      <view class="field">
+        <text class="field-label">默认名额</text>
+        <input type="number" value="{{settings.capacity}}" bindinput="settingInput" data-field="capacity" />
+      </view>
+      <view class="field">
+        <text class="field-label">每节课分钟</text>
+        <input type="number" value="{{settings.lessonMinutes}}" bindinput="settingInput" data-field="lessonMinutes" />
+      </view>
+      <view class="field">
+        <text class="field-label">每周重复几周</text>
+        <input type="number" value="{{settings.repeatWeeks}}" bindinput="settingInput" data-field="repeatWeeks" />
+      </view>
+    </view>
+  </view>
+
+  <view class="card" wx:if="{{previewSlots.length}}">
+    <view class="row card-head">
+      <view class="card-title">预览 {{previewSlots.length}} 个</view>
+      <button class="primary mini" bindtap="submitPreview">提交</button>
+    </view>
+    <view class="list-item" wx:for="{{previewSlots}}" wx:key="index">
+      <view class="row">
+        <view>
+          <view class="name">{{item.slotDate}} {{item.slotTime}}</view>
+          <view class="meta">{{item.campus}} · 名额 {{item.capacity}}</view>
+        </view>
+        <button class="mini" data-index="{{index}}" catchtap="removePreview">移除</button>
+      </view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">手动补一条</view>
     <view class="field">
       <text class="field-label">日期</text>
       <input value="{{form.slotDate}}" placeholder="2026-06-02" bindinput="input" data-field="slotDate" />

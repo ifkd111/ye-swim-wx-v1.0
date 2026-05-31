@@ -7,17 +7,40 @@
   </view>
 
   <view class="card">
-    <block wx:if="{{slots.length}}">
-      <view class="list-item" wx:for="{{slots}}" wx:key="id">
+    <view class="card-title">推荐预约</view>
+    <block wx:if="{{recommended.length}}">
+      <view class="recommend tappable" data-id="{{recommended[0].id}}" bindtap="confirmBook">
+        <view>
+          <view class="name">{{recommended[0].dayLabel}} {{recommended[0].slotTime}}</view>
+          <view class="meta">{{recommended[0].campus}} · {{recommended[0].coach}} · 剩余 {{recommended[0].left}} 位</view>
+        </view>
+        <text class="badge">推荐</text>
+      </view>
+      <button class="primary" data-id="{{recommended[0].id}}" bindtap="confirmBook">预约这个时间</button>
+    </block>
+    <view wx:else class="empty">暂无推荐时间</view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">按时间找</view>
+    <view class="chip-list">
+      <view class="chip {{filter === 'all' ? 'active' : ''}}" bindtap="setFilter" data-filter="all">全部</view>
+      <view class="chip {{filter === 'tomorrow' ? 'active' : ''}}" bindtap="setFilter" data-filter="tomorrow">明天起</view>
+      <view class="chip {{filter === 'week' ? 'active' : ''}}" bindtap="setFilter" data-filter="week">本周</view>
+      <view class="chip {{filter === 'weekend' ? 'active' : ''}}" bindtap="setFilter" data-filter="weekend">周末</view>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">可约时间</view>
+    <block wx:if="{{visibleSlots.length}}">
+      <view class="list-item tappable" wx:for="{{visibleSlots}}" wx:key="id" data-id="{{item.id}}" bindtap="confirmBook">
         <view class="row">
           <view>
-            <view class="name">{{item.slotDate}} {{item.slotTime}}</view>
-            <view class="meta">{{item.campus}} · {{item.coach}} · 名额 {{item.capacity}}</view>
+            <view class="name">{{item.dayLabel}} {{item.slotTime}}</view>
+            <view class="meta">{{item.campus}} · {{item.coach}} · 剩余 {{item.left}} 位</view>
           </view>
           <text class="badge">可约</text>
-        </view>
-        <view class="toolbar">
-          <button class="primary" data-id="{{item.id}}" bindtap="book">提交预约</button>
         </view>
       </view>
     </block>

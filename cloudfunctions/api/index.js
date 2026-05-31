@@ -432,6 +432,18 @@ async function createAvailabilitySlot(viewer, payload) {
   return { message: viewer.role === "admin" ? "可预约时间已发布" : "空余时间已提交，等待管理员发布", slot: Object.assign({ id: result._id }, slot) };
 }
 
+async function createAvailabilitySlots(viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const rows = Array.isArray(payload.slots) ? payload.slots : [];
+  const created = [];
+  for (const row of rows) {
+    const result = await createAvailabilitySlot(viewer, row);
+    created.push(result.slot);
+  }
+  if (!created.length) throw new Error("没有可提交的空余时间");
+  return { message: "已提交 " + created.length + " 个空余时间", slots: created };
+}
+
 async function publishAvailabilitySlot(viewer, payload) {
   assertRole(viewer, ["admin"]);
   await db.collection("availabilitySlots").doc(payload.slotId).update({
@@ -510,6 +522,7 @@ exports.main = async (event) => {
       rejectBookingRequest,
       markAttendance,
       createAvailabilitySlot,
+      createAvailabilitySlots,
       publishAvailabilitySlot,
       createManualSchedule,
       createCourseApplication

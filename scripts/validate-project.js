@@ -49,6 +49,7 @@ function main() {
     "rejectBookingRequest",
     "markAttendance",
     "createAvailabilitySlot",
+    "createAvailabilitySlots",
     "publishAvailabilitySlot",
     "createManualSchedule",
     "createCourseApplication"

@@ -574,6 +574,18 @@ function createAvailabilitySlot(state, viewer, payload) {
   return { message: viewer.role === "admin" ? "可预约时间已发布" : "空余时间已提交，等待管理员发布", slot };
 }
 
+function createAvailabilitySlots(state, viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const rows = Array.isArray(payload.slots) ? payload.slots : [];
+  const created = [];
+  rows.forEach((row) => {
+    const result = createAvailabilitySlot(state, viewer, row);
+    created.push(result.slot);
+  });
+  if (!created.length) throw new Error("没有可提交的空余时间");
+  return { message: "已提交 " + created.length + " 个空余时间", slots: created };
+}
+
 function publishAvailabilitySlot(state, viewer, payload) {
   assertRole(viewer, ["admin"]);
   const slot = state.availabilitySlots.find((item) => item.id === payload.slotId);
@@ -649,6 +661,7 @@ function call(action, payload) {
   else if (action === "rejectBookingRequest") result = rejectBookingRequest(state, viewer, payload);
   else if (action === "markAttendance") result = markAttendance(state, viewer, payload);
   else if (action === "createAvailabilitySlot") result = createAvailabilitySlot(state, viewer, payload);
+  else if (action === "createAvailabilitySlots") result = createAvailabilitySlots(state, viewer, payload);
   else if (action === "publishAvailabilitySlot") result = publishAvailabilitySlot(state, viewer, payload);
   else if (action === "createManualSchedule") result = createManualSchedule(state, viewer, payload);
   else if (action === "createCourseApplication") result = createCourseApplication(state, viewer, payload);

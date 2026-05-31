@@ -1,3 +1,45 @@
 .toolbar button {
   min-width: 180rpx;
 }
+
+.recommend {
+  min-height: 150rpx;
+  padding: 24rpx;
+  margin-bottom: 18rpx;
+  border: 1rpx solid #21415b;
+  border-radius: 16rpx;
+  background: #10233a;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18rpx;
+}
+
+.card button.primary {
+  width: 100%;
+}
+
+.chip-list {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12rpx;
+}
+
+.chip {
+  min-height: 64rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999rpx;
+  border: 1rpx solid #243953;
+  background: #13223a;
+  color: #bdd0e8;
+  font-weight: 800;
+  font-size: 22rpx;
+}
+
+.chip.active {
+  background: #14b8a6;
+  border-color: #14b8a6;
+  color: #04201e;
+}
