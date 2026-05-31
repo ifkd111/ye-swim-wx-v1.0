@@ -1,15 +1,20 @@
 const rules = require("./rules");
 
 const STORAGE_KEY = "ye-swim-wx-v1.mock-state";
-const DEFAULT_PASSWORD = "1324";
+const DEFAULT_ADMIN_PASSWORD = "1324";
+const DEFAULT_MEMBER_PASSWORD = "1234";
+
+function defaultPasswordForRole(role) {
+  return role === "admin" ? DEFAULT_ADMIN_PASSWORD : DEFAULT_MEMBER_PASSWORD;
+}
 
 function initialState() {
   return {
     accounts: [
       {
         id: "account-admin",
-        account: "admin",
-        password: DEFAULT_PASSWORD,
+        account: "yeats",
+        password: DEFAULT_ADMIN_PASSWORD,
         role: "admin",
         fullName: "管理员",
         openid: null,
@@ -18,7 +23,7 @@ function initialState() {
       {
         id: "account-jl001",
         account: "jl001",
-        password: DEFAULT_PASSWORD,
+        password: DEFAULT_MEMBER_PASSWORD,
         role: "coach",
         fullName: "绿洲教练",
         coachName: "绿洲教练",
@@ -29,7 +34,7 @@ function initialState() {
       {
         id: "account-xy001",
         account: "xy001",
-        password: DEFAULT_PASSWORD,
+        password: DEFAULT_MEMBER_PASSWORD,
         role: "student",
         fullName: "白卓可",
         memberId: "member-001",
@@ -159,9 +164,27 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function migrateState(state) {
+  if (!state || !Array.isArray(state.accounts)) return state;
+  state.accounts.forEach((account) => {
+    if (account.account === "admin") {
+      account.account = "yeats";
+      if (account.password === "1324" || !account.password) account.password = DEFAULT_ADMIN_PASSWORD;
+    }
+    if ((account.role === "coach" || account.role === "student") && account.password === "1324") {
+      account.password = DEFAULT_MEMBER_PASSWORD;
+    }
+  });
+  return state;
+}
+
 function loadState() {
   const saved = wx.getStorageSync(STORAGE_KEY);
-  if (saved && saved.accounts && saved.members) return saved;
+  if (saved && saved.accounts && saved.members) {
+    const migrated = migrateState(saved);
+    wx.setStorageSync(STORAGE_KEY, migrated);
+    return migrated;
+  }
   const state = initialState();
   wx.setStorageSync(STORAGE_KEY, state);
   return state;
@@ -381,13 +404,16 @@ function saveAccount(state, viewer, payload) {
   const raw = payload.account || payload;
   const accountName = rules.normalizeAccount(raw.account);
   const role = rules.roleFromAccount(accountName);
-  if (!role) throw new Error("账号必须是 admin、jl 开头或 xy 开头");
+  if (!role) throw new Error("账号必须是 yeats、jl 开头或 xy 开头");
 
   const id = String(raw.id || "").trim();
   const duplicate = state.accounts.find((item) => item.account === accountName && item.id !== id);
   if (duplicate) throw new Error("账号已存在");
 
   const current = id ? state.accounts.find((item) => item.id === id) : null;
+  if (current && current.account !== accountName) {
+    throw new Error("已创建账号不能修改账号名，请新建账号");
+  }
   let memberId = raw.memberId || current && current.memberId || "";
   if (role === "student") {
     const memberName = String(raw.memberName || raw.fullName || "").trim();
@@ -408,7 +434,7 @@ function saveAccount(state, viewer, payload) {
   });
 
   if (!current || raw.password) {
-    next.password = String(raw.password || DEFAULT_PASSWORD);
+    next.password = String(raw.password || defaultPasswordForRole(role));
   }
   if (role === "coach" && !next.coachName) throw new Error("教练账号需要填写教练名");
 
@@ -421,6 +447,28 @@ function saveAccount(state, viewer, payload) {
   next.createdAt = new Date().toISOString();
   state.accounts.push(next);
   return { message: "账号已新增", account: safeAccount(next) };
+}
+
+function resetAccountPassword(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const id = String(payload.id || payload.accountId || "").trim();
+  const accountName = rules.normalizeAccount(payload.account);
+  const account = state.accounts.find((item) => item.id === id || item.account === accountName);
+  if (!account) throw new Error("账号不存在");
+  account.password = defaultPasswordForRole(account.role);
+  account.updatedAt = new Date().toISOString();
+  return { message: "密码已重置为 " + account.password, account: safeAccount(account) };
+}
+
+function changeMyPassword(state, viewer, payload) {
+  const oldPassword = String(payload.oldPassword || "");
+  const newPassword = String(payload.newPassword || "");
+  if (!newPassword || newPassword.length < 4) throw new Error("新密码至少 4 位");
+  if (oldPassword === newPassword) throw new Error("新旧密码不能一样");
+  if (viewer.password !== oldPassword) throw new Error("原密码错误");
+  viewer.password = newPassword;
+  viewer.updatedAt = new Date().toISOString();
+  return { message: "密码已修改，请使用新密码登录" };
 }
 
 function login(payload) {
@@ -656,6 +704,8 @@ function call(action, payload) {
   else if (action === "saveMember") result = saveMember(state, viewer, payload);
   else if (action === "bulkImportMembers") result = bulkImportMembers(state, viewer, payload);
   else if (action === "saveAccount") result = saveAccount(state, viewer, payload);
+  else if (action === "resetAccountPassword") result = resetAccountPassword(state, viewer, payload);
+  else if (action === "changeMyPassword") result = changeMyPassword(state, viewer, payload);
   else if (action === "createBookingRequest") result = createBookingRequest(state, viewer, payload);
   else if (action === "approveBookingRequest") result = approveBookingRequest(state, viewer, payload);
   else if (action === "rejectBookingRequest") result = rejectBookingRequest(state, viewer, payload);

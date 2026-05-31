@@ -8,7 +8,12 @@ const sourcePath = path.resolve(root, "..", "ye-swim", "src", "data", "seed.json
 const fallbackPath = path.resolve(root, "..", "ye-swim", "src", "data", "seed.example.json");
 const outputPath = path.join(root, "cloudbase.seed.json");
 const outputDir = path.join(root, "dist", "cloudbase-seed");
-const defaultPassword = process.env.DEFAULT_PASSWORD || "1324";
+const adminPassword = process.env.ADMIN_PASSWORD || "1324";
+const memberPassword = process.env.DEFAULT_PASSWORD || "1234";
+
+function defaultPasswordForRole(role) {
+  return role === "admin" ? adminPassword : memberPassword;
+}
 
 function readSeed() {
   const file = fs.existsSync(sourcePath) ? sourcePath : fallbackPath;
@@ -34,7 +39,7 @@ function accountDoc(account, role, attrs) {
       role,
       status: "active",
       passwordSalt,
-      passwordHash: hashPassword(defaultPassword, passwordSalt),
+      passwordHash: hashPassword(defaultPasswordForRole(role), passwordSalt),
       openid: null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
@@ -122,7 +127,7 @@ function main() {
   const seed = readSeed();
   const coaches = uniqueCoaches(seed.members || [], seed.schedules || []);
   const accounts = [
-    accountDoc("admin", "admin", {
+    accountDoc("yeats", "admin", {
       fullName: "管理员"
     })
   ];
@@ -188,8 +193,9 @@ function main() {
       attendanceLogs: (seed.attendanceLogs || []).length
     },
     defaults: {
-      password: defaultPassword,
-      accountRule: "admin / jl001... / xy001..."
+      adminPassword,
+      memberPassword,
+      accountRule: "yeats / jl001... / xy001..."
     }
   };
 
@@ -202,7 +208,8 @@ function main() {
   console.log(output.stats);
   console.log("output:", outputPath);
   console.log("collection files:", outputDir);
-  console.log("default password:", defaultPassword);
+  console.log("admin password:", adminPassword);
+  console.log("coach/student password:", memberPassword);
   console.log("booking min date now:", rules.minStudentBookingDate());
 }
 

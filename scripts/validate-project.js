@@ -44,6 +44,8 @@ function main() {
     "saveMember",
     "bulkImportMembers",
     "saveAccount",
+    "resetAccountPassword",
+    "changeMyPassword",
     "createBookingRequest",
     "approveBookingRequest",
     "rejectBookingRequest",

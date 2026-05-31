@@ -6,9 +6,9 @@
 
 默认账号：
 
-- 管理员：`admin` / `1324`
-- 教练：`jl001` / `1324`
-- 学员：`xy001` / `1324`
+- 管理员：`yeats` / `1324`
+- 教练：`jl001` / `1234`
+- 学员：`xy001` / `1234`
 
 ## 电脑上验证
 
@@ -38,7 +38,7 @@ npm run seed:export
 
 ```js
 module.exports = {
-  version: "1.0.4",
+  version: "1.0.5",
   envId: "你的云环境ID",
   useMock: false
 };

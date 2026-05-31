@@ -4,7 +4,7 @@ function normalizeAccount(value) {
 
 function roleFromAccount(account) {
   const normalized = normalizeAccount(account);
-  if (normalized === "admin") return "admin";
+  if (normalized === "yeats") return "admin";
   if (normalized.indexOf("jl") === 0) return "coach";
   if (normalized.indexOf("xy") === 0) return "student";
   return null;

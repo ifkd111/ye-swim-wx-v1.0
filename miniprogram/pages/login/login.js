@@ -2,7 +2,7 @@ const api = require("../../utils/api");
 
 Page({
   data: {
-    account: "admin",
+    account: "yeats",
     password: "1324",
     loading: false
   },

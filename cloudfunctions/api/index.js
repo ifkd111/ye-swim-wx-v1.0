@@ -23,6 +23,10 @@ function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(String(password), salt, 120000, 32, "sha256").toString("hex");
 }
 
+function defaultPasswordForRole(role) {
+  return role === "admin" ? "1324" : "1234";
+}
+
 function withId(doc) {
   if (!doc) return doc;
   const result = Object.assign({}, doc);
@@ -290,10 +294,13 @@ async function saveAccount(viewer, payload) {
   const raw = payload.account || payload;
   const accountName = rules.normalizeAccount(raw.account);
   const role = rules.roleFromAccount(accountName);
-  if (!role) throw new Error("账号必须是 admin、jl 开头或 xy 开头");
+  if (!role) throw new Error("账号必须是 yeats、jl 开头或 xy 开头");
 
   const id = String(raw.id || raw._id || "").trim();
   const current = id ? (await list("accounts", { _id: id }, 1))[0] || null : null;
+  if (current && current.account !== accountName) {
+    throw new Error("已创建账号不能修改账号名，请新建账号");
+  }
   const duplicates = await list("accounts", { account: accountName }, 10);
   if (duplicates.some((item) => item._id !== id)) throw new Error("账号已存在");
 
@@ -320,7 +327,7 @@ async function saveAccount(viewer, payload) {
 
   if (!current || raw.password) {
     account.passwordSalt = crypto.randomBytes(16).toString("hex");
-    account.passwordHash = hashPassword(String(raw.password || "1324"), account.passwordSalt);
+    account.passwordHash = hashPassword(String(raw.password || defaultPasswordForRole(role)), account.passwordSalt);
   }
 
   if (current) {
@@ -332,6 +339,43 @@ async function saveAccount(viewer, payload) {
   account.createdAt = nowIso();
   const result = await db.collection("accounts").add({ data: account });
   return { message: "账号已新增", account: safeAccount(Object.assign({ _id: result._id }, account)) };
+}
+
+async function resetAccountPassword(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const id = String(payload.id || payload.accountId || "").trim();
+  const accountName = rules.normalizeAccount(payload.account);
+  const accounts = await list("accounts", id ? { _id: id } : { account: accountName }, 1);
+  const account = accounts[0];
+  if (!account) throw new Error("账号不存在");
+  const passwordSalt = crypto.randomBytes(16).toString("hex");
+  const plainPassword = defaultPasswordForRole(account.role);
+  await db.collection("accounts").doc(account._id).update({
+    data: {
+      passwordSalt,
+      passwordHash: hashPassword(plainPassword, passwordSalt),
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "密码已重置为 " + plainPassword, account: safeAccount(account) };
+}
+
+async function changeMyPassword(viewer, payload) {
+  const oldPassword = String(payload.oldPassword || "");
+  const newPassword = String(payload.newPassword || "");
+  if (!newPassword || newPassword.length < 4) throw new Error("新密码至少 4 位");
+  if (oldPassword === newPassword) throw new Error("新旧密码不能一样");
+  const hashed = hashPassword(oldPassword, viewer.passwordSalt);
+  if (hashed !== viewer.passwordHash) throw new Error("原密码错误");
+  const passwordSalt = crypto.randomBytes(16).toString("hex");
+  await db.collection("accounts").doc(viewer._id).update({
+    data: {
+      passwordSalt,
+      passwordHash: hashPassword(newPassword, passwordSalt),
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "密码已修改，请使用新密码登录" };
 }
 
 async function approveBookingRequest(viewer, payload) {
@@ -517,6 +561,8 @@ exports.main = async (event) => {
       saveMember,
       bulkImportMembers,
       saveAccount,
+      resetAccountPassword,
+      changeMyPassword,
       createBookingRequest,
       approveBookingRequest,
       rejectBookingRequest,

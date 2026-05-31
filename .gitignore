@@ -6,6 +6,8 @@ coverage/
 private.key
 *.private.key
 cloudbase.seed.json
+preview-qrcode.jpg
+ci-quality-report.json
 miniprogram/private.config.json
 miniprogram/miniprogram_npm/
 *.log

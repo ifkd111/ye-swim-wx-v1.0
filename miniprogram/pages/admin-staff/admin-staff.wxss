@@ -13,6 +13,11 @@
   width: 100%;
 }
 
+.reset-button {
+  width: 100%;
+  margin-top: 16rpx;
+}
+
 .right-stack {
   display: flex;
   flex-direction: column;

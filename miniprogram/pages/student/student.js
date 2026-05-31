@@ -68,6 +68,10 @@ Page({
     wx.navigateTo({ url: "/pages/student-records/student-records?focus=attendance" });
   },
 
+  changePassword() {
+    wx.navigateTo({ url: "/pages/change-password/change-password" });
+  },
+
   applyCourse() {
     const product = this.data.courseProducts[0];
     if (!product) {

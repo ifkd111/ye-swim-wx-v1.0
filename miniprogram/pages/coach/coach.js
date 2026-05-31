@@ -87,6 +87,10 @@ Page({
     wx.navigateTo({ url: "/pages/coach-members/coach-members" });
   },
 
+  changePassword() {
+    wx.navigateTo({ url: "/pages/change-password/change-password" });
+  },
+
   logout() {
     api.clearSession();
     wx.reLaunch({ url: "/pages/login/login" });

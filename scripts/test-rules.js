@@ -2,7 +2,8 @@ const assert = require("assert");
 const rules = require("../shared/rules");
 
 function testRole() {
-  assert.strictEqual(rules.roleFromAccount("admin"), "admin");
+  assert.strictEqual(rules.roleFromAccount("yeats"), "admin");
+  assert.strictEqual(rules.roleFromAccount("admin"), null);
   assert.strictEqual(rules.roleFromAccount("JL001"), "coach");
   assert.strictEqual(rules.roleFromAccount("xy001"), "student");
   assert.strictEqual(rules.roleFromAccount("abc"), null);

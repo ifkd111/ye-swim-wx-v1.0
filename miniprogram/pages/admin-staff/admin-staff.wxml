@@ -1,8 +1,8 @@
 <view class="page">
   <view class="topbar">
-    <view>
+      <view>
       <view class="title">账号</view>
-      <view class="subtitle">admin / jl / xy 自动分工</view>
+      <view class="subtitle">yeats / jl / xy 自动分工</view>
     </view>
     <button class="primary mini" bindtap="resetForm">新增</button>
   </view>
@@ -12,11 +12,11 @@
     <view class="form-grid">
       <view class="field">
         <text class="field-label">账号</text>
-        <input value="{{form.account}}" placeholder="jl002 / xy002" bindinput="input" data-field="account" />
+        <input value="{{form.account}}" disabled="{{!!form.id}}" placeholder="jl002 / xy002" bindinput="input" data-field="account" />
       </view>
       <view class="field">
         <text class="field-label">密码</text>
-        <input password value="{{form.password}}" placeholder="新建默认 1324，修改留空" bindinput="input" data-field="password" />
+        <input password value="{{form.password}}" placeholder="教练/学员默认 1234，修改留空" bindinput="input" data-field="password" />
       </view>
       <view class="field">
         <text class="field-label">备注名</text>
@@ -37,6 +37,7 @@
     </view>
     <view class="role-hint">当前会进入：{{formRoleText}}</view>
     <button class="primary" bindtap="saveAccount">保存账号</button>
+    <button wx:if="{{form.id}}" class="danger reset-button" bindtap="resetPassword">重置为默认密码</button>
   </view>
 
   <view class="card">

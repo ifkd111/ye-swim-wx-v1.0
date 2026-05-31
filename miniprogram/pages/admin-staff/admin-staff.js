@@ -46,7 +46,7 @@ Page({
     if (role === "admin") return "管理员";
     if (role === "coach") return "教练";
     if (role === "student") return "学员";
-    return "账号必须是 admin、jl 开头或 xy 开头";
+    return "账号必须是 yeats、jl 开头或 xy 开头";
   },
 
   input(event) {
@@ -92,5 +92,24 @@ Page({
         this.load();
       })
       .catch(api.fail);
+  },
+
+  resetPassword() {
+    if (!this.data.form.id) return;
+    wx.showModal({
+      title: "重置密码",
+      content: "确认重置该账号密码？管理员默认 1324，教练/学员默认 1234。",
+      success: (modal) => {
+        if (!modal.confirm) return;
+        api.syncing("正在重置");
+        api
+          .call("resetAccountPassword", { id: this.data.form.id })
+          .then((result) => {
+            api.done(result.message);
+            this.load();
+          })
+          .catch(api.fail);
+      }
+    });
   }
 });

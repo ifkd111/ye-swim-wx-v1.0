@@ -32,6 +32,10 @@ Page({
     wx.navigateTo({ url: event.currentTarget.dataset.url });
   },
 
+  changePassword() {
+    wx.navigateTo({ url: "/pages/change-password/change-password" });
+  },
+
   logout() {
     api.clearSession();
     wx.reLaunch({ url: "/pages/login/login" });

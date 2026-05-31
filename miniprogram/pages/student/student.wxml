@@ -4,7 +4,10 @@
       <view class="title">我的课程</view>
       <view class="subtitle">{{member.chineseName || viewer.fullName}}</view>
     </view>
-    <button bindtap="logout">退出</button>
+    <view class="top-actions">
+      <button class="mini" bindtap="changePassword">改密码</button>
+      <button bindtap="logout">退出</button>
+    </view>
   </view>
 
   <view class="card" wx:if="{{member.id}}">
