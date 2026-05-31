@@ -8,10 +8,10 @@
 
 ## 当前状态
 
-- 版本：`1.0.5`
+- 版本：`1.0.6`
 - 小程序 AppID：`wx7f2d509804954eaf`
-- 云环境 ID：先使用 `cloud1-placeholder`，后续在 `miniprogram/env.js` 和云函数环境中替换。
-- 数据源：默认支持 mock 模式；接入微信云开发后由 `cloudfunctions/api` 统一处理数据。
+- 云环境 ID：`cloudbase-d6ge373q7724bcfe4`
+- 数据源：微信云开发正式环境；所有业务写入由 `cloudfunctions/api` 统一处理，空库首次管理员登录会自动初始化示例数据。
 
 ## 本地命令
 
@@ -34,13 +34,13 @@ CI 上传需要微信公众平台的“代码上传密钥”，不是 AppSecret�
 
 ```bash
 npm run ci:preview
-npm run ci:upload -- 1.0.5 叶小程序真实云环境版
-npm run ci:upload -- --uv=1.0.5 --ud=叶小程序真实云环境版
-npm run ci:upload-function -- --env=你的云环境ID
+npm run ci:upload -- 1.0.6 叶小程序真实云环境联调版
+npm run ci:upload -- --uv=1.0.6 --ud=叶小程序真实云环境联调版
+npm run ci:upload-function -- --env=cloudbase-d6ge373q7724bcfe4
 npm run ci:quality
 ```
 
-当前 `1.0.5` 开发版已上传成功，远端 GitHub `main` 和 tag `v1.0.5` 已同步。
+当前 `1.0.6` 切换到真实微信云开发环境；远端 GitHub 和 tag 按发布记录同步。
 
 ## 默认账号
 

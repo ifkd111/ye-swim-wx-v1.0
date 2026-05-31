@@ -7,6 +7,13 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
+let seedData = null;
+try {
+  seedData = require("./seed-data.json");
+} catch (error) {
+  seedData = null;
+}
+
 function ok(data) {
   return { ok: true, data };
 }
@@ -68,9 +75,83 @@ async function list(collection, query, limit) {
   return result.data || [];
 }
 
+function isMissingCollectionError(error) {
+  const message = String(error && (error.errMsg || error.message || error));
+  return /collection.*not.*exist|DATABASE_COLLECTION_NOT_EXIST|db\.collection|不存在/i.test(message);
+}
+
+async function countCollection(collection, query) {
+  try {
+    const result = await db.collection(collection).where(query || {}).count();
+    return result.total || 0;
+  } catch (error) {
+    if (isMissingCollectionError(error)) return 0;
+    throw error;
+  }
+}
+
+async function createCollectionIfNeeded(collection) {
+  if (typeof db.createCollection !== "function") return;
+  try {
+    await db.createCollection(collection);
+  } catch (error) {
+    if (!/exist|存在|already/i.test(String(error && (error.errMsg || error.message || error)))) {
+      throw error;
+    }
+  }
+}
+
+async function addRows(collection, rows) {
+  if (!rows || !rows.length) return;
+  await createCollectionIfNeeded(collection);
+  for (let index = 0; index < rows.length; index += 100) {
+    const part = rows.slice(index, index + 100);
+    try {
+      await db.collection(collection).add({ data: part });
+    } catch (error) {
+      if (!Array.isArray(part) || part.length === 1) throw error;
+      for (const row of part) {
+        await db.collection(collection).add({ data: row });
+      }
+    }
+  }
+}
+
+async function bootstrapSeedIfNeeded(accountName, password) {
+  if (accountName !== "yeats" || String(password || "") !== "1324") return;
+  if (!seedData || !seedData.collections) return;
+  const existingAccounts = await countCollection("accounts");
+  if (existingAccounts > 0) return;
+
+  const order = [
+    "accounts",
+    "courseProducts",
+    "members",
+    "schedules",
+    "attendanceLogs",
+    "availabilitySlots",
+    "bookingRequests",
+    "courseApplications",
+    "auditLogs"
+  ];
+  for (const collection of order) {
+    await addRows(collection, seedData.collections[collection] || []);
+  }
+}
+
 async function login(payload, wxContext) {
   const accountName = rules.normalizeAccount(payload.account);
-  const account = await getAccountByName(accountName);
+  let account = await getAccountByName(accountName).catch(async (error) => {
+    if (!isMissingCollectionError(error)) throw error;
+    return null;
+  });
+  if (!account) {
+    await bootstrapSeedIfNeeded(accountName, payload.password);
+    account = await getAccountByName(accountName).catch(async (error) => {
+      if (!isMissingCollectionError(error)) throw error;
+      return null;
+    });
+  }
   if (!account) throw new Error("账号或密码错误");
 
   const hashed = hashPassword(payload.password || "", account.passwordSalt);
