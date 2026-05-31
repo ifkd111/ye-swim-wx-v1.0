@@ -54,7 +54,13 @@ function createProject() {
     type: "miniProgram",
     projectPath: root,
     privateKeyPath,
-    ignores: ["node_modules/**/*", "cloudbase.seed.json", "dist/**/*", "*.log"]
+    ignores: [
+      "node_modules/**/*",
+      "cloudbase.seed.json",
+      "dist/**/*",
+      "*.log",
+      "cloudfunctions/api/seed-data.json"
+    ]
   });
 }
 

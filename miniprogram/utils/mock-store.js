@@ -485,7 +485,7 @@ function login(payload) {
   }
 
   const openid = payload.openid || "mock-openid";
-  if (account.openid && account.openid !== openid) {
+  if (account.openid && account.openid !== openid && account.role !== "admin") {
     throw new Error("该账号已经绑定其他微信");
   }
 

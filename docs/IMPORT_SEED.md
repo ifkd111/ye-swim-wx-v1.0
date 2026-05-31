@@ -20,7 +20,17 @@ npm run seed:export
 - `dist/cloudbase-seed/courseApplications.json`
 - `dist/cloudbase-seed/auditLogs.json`
 
-在微信开发者工具的云开发数据库里，按集合名称创建集合，然后导入对应 JSON 文件。
+推荐直接运行自动导入：
+
+```powershell
+cd D:\课表\ye-swim-wx-v1.0
+npm run ci:upload-function-direct -- --env=cloudbase-d6ge373q7724bcfe4
+npm run ci:seed-cloud -- --env=cloudbase-d6ge373q7724bcfe4
+```
+
+脚本会先清空同名集合，再按 `accounts -> courseProducts -> members -> schedules -> attendanceLogs -> availabilitySlots` 的顺序分批导入，避免把大数据导入塞到手机登录流程里。
+
+如果自动导入失败，也可以在微信开发者工具的云开发数据库里，按集合名称创建集合，然后手动导入对应 JSON 文件。
 
 管理员默认密码是 `1324`，教练和学员默认密码是 `1234`。账号规则：
 

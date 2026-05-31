@@ -353,7 +353,7 @@ function buildOutput(memberMap, rawSchedules) {
 
   return {
     seed: {
-      seedVersion: "attendance-xlsx-v1.0.7",
+      seedVersion: "attendance-xlsx-v1.0.8",
       exportedAt: new Date().toISOString(),
       source: sourcePath,
       collections: {

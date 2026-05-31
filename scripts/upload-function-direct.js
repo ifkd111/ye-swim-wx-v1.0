@@ -22,6 +22,10 @@ function requireValue(value, message) {
   return value;
 }
 
+function seedSecret() {
+  return process.env.YE_SWIM_SEED_SECRET || "ye-swim-local-seed-v1";
+}
+
 function createProject() {
   const config = readJson(path.join(root, "project.config.json"));
   const appid = getArg("appid", process.env.WX_APPID || config.appid);
@@ -33,7 +37,13 @@ function createProject() {
     type: "miniProgram",
     projectPath: root,
     privateKeyPath,
-    ignores: ["node_modules/**/*", "cloudbase.seed.json", "dist/**/*", "*.log"]
+    ignores: [
+      "node_modules/**/*",
+      "cloudbase.seed.json",
+      "dist/**/*",
+      "*.log",
+      "cloudfunctions/api/seed-data.json"
+    ]
   });
 }
 
@@ -78,8 +88,15 @@ async function main() {
         handler: "index.main",
         description: "",
         memorySize: 256,
-        timeout: 10,
-        environment: { variables: [] },
+        timeout: 60,
+        environment: {
+          variables: [
+            {
+              key: "YE_SWIM_SEED_SECRET",
+              value: seedSecret()
+            }
+          ]
+        },
         role: "TCB_QcsRole",
         runtime: "Nodejs16.13",
         namespace: env,
@@ -90,6 +107,30 @@ async function main() {
       },
       opts
     );
+  } else {
+    try {
+      await cloudAPI.scfUpdateFunctionInfo(
+        {
+          functionName: name,
+          namespace: env,
+          region,
+          memorySize: 256,
+          timeout: 60,
+          installDependency: false,
+          environment: {
+            variables: [
+              {
+                key: "YE_SWIM_SEED_SECRET",
+                value: seedSecret()
+              }
+            ]
+          }
+        },
+        opts
+      );
+    } catch (error) {
+      console.warn("云函数配置更新失败，继续上传代码：", error.message || error);
+    }
   }
 
   const zipped = zipFile(functionPath);

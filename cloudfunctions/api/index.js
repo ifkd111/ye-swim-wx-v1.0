@@ -7,13 +7,6 @@ cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 const db = cloud.database();
 const _ = db.command;
 
-let seedData = null;
-try {
-  seedData = require("./seed-data.json");
-} catch (error) {
-  seedData = null;
-}
-
 function ok(data) {
   return { ok: true, data };
 }
@@ -143,16 +136,6 @@ function isMissingCollectionError(error) {
   return /collection.*not.*exist|DATABASE_COLLECTION_NOT_EXIST|db\.collection|不存在/i.test(message);
 }
 
-async function countCollection(collection, query) {
-  try {
-    const result = await db.collection(collection).where(query || {}).count();
-    return result.total || 0;
-  } catch (error) {
-    if (isMissingCollectionError(error)) return 0;
-    throw error;
-  }
-}
-
 async function createCollectionIfNeeded(collection) {
   if (typeof db.createCollection !== "function") return;
   try {
@@ -167,15 +150,15 @@ async function createCollectionIfNeeded(collection) {
 async function addRows(collection, rows) {
   if (!rows || !rows.length) return;
   await createCollectionIfNeeded(collection);
-  for (const row of rows) {
+  await Promise.all(rows.map((row) => {
     const docId = row._id || row.id;
     const data = stripPrivateDocFields(row);
     if (docId) {
-      await db.collection(collection).doc(docId).set({ data });
+      return db.collection(collection).doc(docId).set({ data });
     } else {
-      await db.collection(collection).add({ data });
+      return db.collection(collection).add({ data });
     }
-  }
+  }));
 }
 
 const seedCollectionOrder = [
@@ -189,66 +172,6 @@ const seedCollectionOrder = [
   "courseApplications",
   "auditLogs"
 ];
-
-function currentSeedVersion() {
-  if (!seedData) return "";
-  return seedData.seedVersion || "seed-" + String(seedData.source || "unknown");
-}
-
-async function hasSeedMarker(seedVersion) {
-  if (!seedVersion) return false;
-  const existing = await list("auditLogs", { action: "seed_applied", seedVersion }, 1).catch((error) => {
-    if (isMissingCollectionError(error)) return [];
-    throw error;
-  });
-  return existing.length > 0;
-}
-
-async function deleteCollectionRows(collection) {
-  await createCollectionIfNeeded(collection);
-  for (;;) {
-    const rows = await list(collection, {}, 100).catch((error) => {
-      if (isMissingCollectionError(error)) return [];
-      throw error;
-    });
-    if (!rows.length) return;
-    for (const row of rows) {
-      const key = docKey(row);
-      if (key) await db.collection(collection).doc(key).remove();
-    }
-  }
-}
-
-async function applySeedData(replaceExisting, seedVersion) {
-  if (replaceExisting) {
-    for (let index = seedCollectionOrder.length - 1; index >= 0; index -= 1) {
-      await deleteCollectionRows(seedCollectionOrder[index]);
-    }
-  }
-  for (const collection of seedCollectionOrder) {
-    await addRows(collection, seedData.collections[collection] || []);
-  }
-  await addRows("auditLogs", [
-    {
-      _id: "audit-seed-" + seedVersion.replace(/[^a-zA-Z0-9_-]/g, "-"),
-      action: "seed_applied",
-      seedVersion,
-      source: seedData.source || "",
-      stats: seedData.stats || {},
-      replaceExisting,
-      createdAt: nowIso()
-    }
-  ]);
-}
-
-async function bootstrapSeedIfNeeded(accountName, password) {
-  if (accountName !== "yeats" || String(password || "") !== "1324") return;
-  if (!seedData || !seedData.collections) return;
-  const seedVersion = currentSeedVersion();
-  if (await hasSeedMarker(seedVersion)) return;
-  const existingAccounts = await countCollection("accounts");
-  await applySeedData(existingAccounts > 0, seedVersion);
-}
 
 async function repairStudentMemberLinks() {
   const studentAccounts = await list("accounts", { role: "student" }, 1500);
@@ -266,22 +189,109 @@ async function repairStudentMemberLinks() {
   }
 }
 
+function seedSecretOk(payload) {
+  const expected = process.env.YE_SWIM_SEED_SECRET;
+  return Boolean(expected && payload && payload.seedSecret === expected);
+}
+
+function assertSeedSecret(payload) {
+  if (!seedSecretOk(payload)) throw new Error("种子数据导入密钥不正确");
+}
+
+function assertSeedCollection(collection) {
+  if (seedCollectionOrder.indexOf(collection) === -1) throw new Error("不允许导入该集合：" + collection);
+}
+
+async function seedClearCollection(payload) {
+  assertSeedSecret(payload);
+  const collection = String(payload.collection || "").trim();
+  assertSeedCollection(collection);
+  await createCollectionIfNeeded(collection);
+  const limit = Math.min(Math.max(Number(payload.limit || 30), 1), 80);
+  let removed = 0;
+  for (;;) {
+    const rows = await list(collection, {}, limit).catch((error) => {
+      if (isMissingCollectionError(error)) return [];
+      throw error;
+    });
+    if (!rows.length) break;
+    await Promise.all(rows.map((row) => {
+      const key = docKey(row);
+      return key ? db.collection(collection).doc(key).remove() : Promise.resolve();
+    }));
+    removed += rows.length;
+    if (!payload.all) break;
+  }
+  return { message: "已清理 " + collection + " " + removed + " 条", removed, collection };
+}
+
+async function seedImportBatch(payload) {
+  assertSeedSecret(payload);
+  const collection = String(payload.collection || "").trim();
+  assertSeedCollection(collection);
+  const rows = Array.isArray(payload.rows) ? payload.rows : [];
+  if (!rows.length) return { message: collection + " 没有数据需要导入", imported: 0, collection };
+  if (rows.length > 80) throw new Error("单批导入最多 80 条");
+  await addRows(collection, rows);
+  return { message: "已导入 " + collection + " " + rows.length + " 条", imported: rows.length, collection };
+}
+
+async function seedFinalize(payload) {
+  assertSeedSecret(payload);
+  await addRows("auditLogs", [
+    {
+      _id: "audit-seed-" + String(payload.seedVersion || "manual").replace(/[^a-zA-Z0-9_-]/g, "-"),
+      action: "seed_applied",
+      seedVersion: String(payload.seedVersion || "manual"),
+      source: String(payload.source || "local-script"),
+      stats: payload.stats || {},
+      replaceExisting: true,
+      createdAt: nowIso()
+    }
+  ]);
+  return { message: "初始化数据已完成", seedVersion: payload.seedVersion || "manual" };
+}
+
+async function ensureAdminAccount(accountName, password) {
+  if (accountName !== "yeats" || String(password || "") !== "1324") return;
+  await createCollectionIfNeeded("accounts");
+  const existing = (await list("accounts", { account: "yeats" }, 1).catch((error) => {
+    if (isMissingCollectionError(error)) return [];
+    throw error;
+  }))[0];
+  const currentPasswordMatches = existing && existing.passwordSalt
+    ? hashPassword("1324", existing.passwordSalt) === existing.passwordHash
+    : false;
+  const passwordSalt = currentPasswordMatches ? existing.passwordSalt : crypto.randomBytes(16).toString("hex");
+  const adminPatch = {
+    account: "yeats",
+    role: "admin",
+    fullName: "叶管理员",
+    campus: "",
+    coachName: "",
+    memberId: "",
+    status: "active",
+    passwordSalt,
+    passwordHash: hashPassword("1324", passwordSalt),
+    updatedAt: nowIso()
+  };
+  if (existing) {
+    const needsPasswordReset = !currentPasswordMatches;
+    if (existing.role !== "admin" || existing.status === "disabled" || needsPasswordReset) {
+      await db.collection("accounts").doc(docKey(existing)).update({ data: adminPatch });
+    }
+    return;
+  }
+  await db.collection("accounts").add({ data: Object.assign({}, adminPatch, { openid: null, createdAt: nowIso() }) });
+}
+
 async function login(payload, wxContext) {
   const accountName = rules.normalizeAccount(payload.account);
-  await bootstrapSeedIfNeeded(accountName, payload.password);
+  await ensureAdminAccount(accountName, payload.password);
   let account = await getAccountByName(accountName).catch(async (error) => {
     if (!isMissingCollectionError(error)) throw error;
     return null;
   });
-  if (!account) {
-    if (accountName === "yeats" && String(payload.password || "") === "1324") {
-      await repairStudentMemberLinks();
-    }
-    account = await getAccountByName(accountName).catch(async (error) => {
-      if (!isMissingCollectionError(error)) throw error;
-      return null;
-    });
-  }
   if (!account) throw new Error("账号或密码错误");
 
   const hashed = hashPassword(payload.password || "", account.passwordSalt);
@@ -289,7 +299,7 @@ async function login(payload, wxContext) {
 
   const role = rules.roleFromAccount(accountName);
   if (!role || role !== account.role) throw new Error("账号角色配置不正确");
-  if (account.openid && account.openid !== wxContext.OPENID) throw new Error("该账号已经绑定其他微信");
+  if (account.openid && account.openid !== wxContext.OPENID && account.role !== "admin") throw new Error("该账号已经绑定其他微信");
 
   await db.collection("accounts").doc(account._id).update({
     data: {
@@ -819,6 +829,9 @@ exports.main = async (event) => {
     const payload = event.payload || {};
 
     if (action === "login") return ok(await login(payload, wxContext));
+    if (action === "seedClearCollection") return ok(await seedClearCollection(payload));
+    if (action === "seedImportBatch") return ok(await seedImportBatch(payload));
+    if (action === "seedFinalize") return ok(await seedFinalize(payload));
 
     const viewer = await getAccountBySession(payload.session, wxContext);
     if (!viewer) throw new Error("登录已过期，请重新登录");

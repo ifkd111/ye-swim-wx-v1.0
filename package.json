@@ -1,6 +1,6 @@
 {
   "name": "ye-swim-wx-v1.0",
-  "version": "1.0.7",
+  "version": "1.0.8",
   "private": true,
   "description": "叶 微信小程序 v1.0，覆盖管理员、教练、学员预约与出勤闭环。",
   "scripts": {
@@ -13,6 +13,7 @@
     "ci:upload": "node scripts/miniprogram-ci.js upload",
     "ci:upload-function": "node scripts/miniprogram-ci.js upload-function",
     "ci:upload-function-direct": "node scripts/upload-function-direct.js",
+    "ci:seed-cloud": "node scripts/import-cloud-seed.js",
     "ci:quality": "node scripts/miniprogram-ci.js quality"
   },
   "dependencies": {
