@@ -4,7 +4,7 @@
 
 .role-hint {
   margin: 18rpx 0;
-  color: #67e8f9;
+  color: #1d6fd8;
   font-size: 24rpx;
   font-weight: 800;
 }

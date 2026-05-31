@@ -1,26 +1,27 @@
 .chip-list {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 12rpx;
 }
 
 .chip {
+  min-width: calc((100% - 36rpx) / 4);
   min-height: 64rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 999rpx;
-  border: 1rpx solid #243953;
-  background: #13223a;
-  color: #bdd0e8;
+  border: 1rpx solid #d5e7fb;
+  background: #eef6ff;
+  color: #12325b;
   font-weight: 800;
   font-size: 22rpx;
 }
 
 .chip.active {
-  background: #14b8a6;
-  border-color: #14b8a6;
-  color: #04201e;
+  background: #1268cf;
+  border-color: #1268cf;
+  color: #ffffff;
 }
 
 .confirm-button {

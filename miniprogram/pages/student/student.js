@@ -73,14 +73,10 @@ Page({
   },
 
   applyCourse() {
-    const product = this.data.courseProducts[0];
-    if (!product) {
-      api.toast("暂无可申请产品");
-      return;
-    }
+    const product = this.data.courseProducts[0] || {};
     api.syncing("正在提交");
     api
-      .call("createCourseApplication", { productId: product.id, note: this.data.courseNote })
+      .call("createCourseApplication", { productId: product.id || "", note: this.data.courseNote })
       .then((result) => {
         api.done(result.message);
         this.setData({ courseNote: "" });

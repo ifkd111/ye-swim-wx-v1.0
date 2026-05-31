@@ -1,0 +1,105 @@
+const assert = require("assert");
+
+const storage = {};
+global.wx = {
+  getStorageSync(key) {
+    return storage[key];
+  },
+  setStorageSync(key, value) {
+    storage[key] = value;
+  },
+  removeStorageSync(key) {
+    delete storage[key];
+  }
+};
+
+const mock = require("../miniprogram/utils/mock-store");
+
+function login(account, password) {
+  return mock.call("login", { account, password, openid: "flow-" + account }).session;
+}
+
+function call(session, action, payload) {
+  return mock.call(action, Object.assign({}, payload || {}, { session }));
+}
+
+function main() {
+  mock.call("resetMock");
+
+  const admin = login("yeats", "1324");
+  const coach = login("jl001", "1234");
+  const student = login("xy001", "1234");
+  assert.strictEqual(admin.role, "admin");
+  assert.strictEqual(coach.role, "coach");
+  assert.strictEqual(student.role, "student");
+
+  const adminHome = call(admin, "getHomeData");
+  assert(adminHome.members.length >= 3, "管理员应看到学员");
+  assert(adminHome.accounts.length >= 3, "管理员应看到账号");
+
+  const newMember = call(admin, "saveMember", {
+    member: {
+      chineseName: "流程测试学员",
+      campus: "绿洲",
+      coach: "绿洲教练",
+      productName: "20次卡",
+      productType: "class_pack",
+      totalLessons: 20,
+      notes: "自动流程测试"
+    }
+  }).member;
+  assert(newMember.id, "管理员新增学员失败");
+
+  const newAccount = call(admin, "saveAccount", {
+    account: {
+      account: "xy999",
+      password: "1234",
+      fullName: "流程测试学员",
+      memberName: "流程测试学员",
+      campus: "绿洲"
+    }
+  }).account;
+  assert.strictEqual(newAccount.role, "student");
+  call(admin, "resetAccountPassword", { id: newAccount.id });
+
+  const availability = call(coach, "createAvailabilitySlot", {
+    slotDate: "2026-06-05",
+    slotTime: "17:00-18:00",
+    campus: "绿洲",
+    capacity: 2
+  }).slot;
+  assert.strictEqual(availability.status, "draft", "教练提交空余应为草稿");
+  call(admin, "publishAvailabilitySlot", { slotId: availability.id });
+
+  const refreshedStudentHome = call(student, "getHomeData");
+  const slot = refreshedStudentHome.availabilitySlots.find((item) => item.id === availability.id);
+  assert(slot, "学员应看到已发布可约时间");
+
+  const booking = call(student, "createBookingRequest", { slotId: slot.id }).request;
+  assert.strictEqual(booking.status, "pending", "学员预约应进入待审批");
+
+  const approved = call(admin, "approveBookingRequest", { requestId: booking.id }).schedule;
+  assert(approved.id, "管理员审批应生成排课");
+
+  const coachHome = call(coach, "getHomeData");
+  assert(coachHome.members.length >= 1, "教练应看到自己学员");
+  const pendingSchedule = coachHome.schedules.find((item) => item.id === approved.id);
+  assert(pendingSchedule, "教练应看到管理员审批生成的排课");
+
+  const attendance = call(coach, "markAttendance", { scheduleId: pendingSchedule.id });
+  assert(attendance.message.indexOf("确认出勤") >= 0, "教练确认出勤失败");
+
+  const application = call(student, "createCourseApplication", {
+    productId: refreshedStudentHome.courseProducts[0].id,
+    note: "流程测试续课"
+  }).application;
+  assert.strictEqual(application.status, "pending", "学员课程申请失败");
+
+  const studentRecords = call(student, "getHomeData");
+  assert(studentRecords.bookingRequests.length >= 1, "学员应看到预约记录");
+  assert(studentRecords.courseApplications.length >= 1, "学员应看到课程申请");
+
+  console.log("Flow tests passed");
+}
+
+main();

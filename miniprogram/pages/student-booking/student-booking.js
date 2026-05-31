@@ -46,9 +46,9 @@ Page({
         if (booking.status === "pending" || booking.status === "approved") activeBySlot[booking.slotId] = true;
       });
       const slots = (data.availabilitySlots || [])
-        .filter((slot) => !activeBySlot[slot.id])
+        .filter((slot) => !activeBySlot[slot.id] && Number(slot.left === undefined ? slot.capacity || 1 : slot.left) > 0)
         .map((slot) => {
-          const left = Math.max(1, Number(slot.capacity || 1));
+          const left = Math.max(0, Number(slot.left === undefined ? slot.capacity || 1 : slot.left));
           return Object.assign({}, slot, {
             dayLabel: dayLabel(slot.slotDate),
             left

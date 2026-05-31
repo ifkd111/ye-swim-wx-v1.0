@@ -5,7 +5,7 @@
 .metric-action {
   display: block;
   margin-top: 12rpx;
-  color: #d7faff;
+  color: #1d6fd8;
   font-size: 22rpx;
   font-weight: 800;
 }

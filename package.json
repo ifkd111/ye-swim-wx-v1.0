@@ -1,19 +1,23 @@
 {
   "name": "ye-swim-wx-v1.0",
-  "version": "1.0.6",
+  "version": "1.0.7",
   "private": true,
   "description": "叶 微信小程序 v1.0，覆盖管理员、教练、学员预约与出勤闭环。",
   "scripts": {
     "validate": "node scripts/validate-project.js",
     "test:rules": "node scripts/test-rules.js",
+    "test:flow": "node scripts/test-flow.js",
     "seed:export": "node scripts/export-seed-cloudbase.js",
+    "seed:attendance": "node scripts/export-seed-from-attendance-xlsx.js",
     "ci:preview": "node scripts/miniprogram-ci.js preview",
     "ci:upload": "node scripts/miniprogram-ci.js upload",
     "ci:upload-function": "node scripts/miniprogram-ci.js upload-function",
+    "ci:upload-function-direct": "node scripts/upload-function-direct.js",
     "ci:quality": "node scripts/miniprogram-ci.js quality"
   },
   "dependencies": {
     "miniprogram-ci": "^2.1.31",
-    "wx-server-sdk": "^3.0.4"
+    "wx-server-sdk": "^3.0.4",
+    "xlsx": "^0.18.5"
   }
 }

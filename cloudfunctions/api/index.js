@@ -37,8 +37,62 @@ function defaultPasswordForRole(role) {
 function withId(doc) {
   if (!doc) return doc;
   const result = Object.assign({}, doc);
-  if (!result.id && result._id) result.id = result._id;
+  if (result._id) {
+    if (result.id && result.id !== result._id) result.businessId = result.id;
+    result.id = result._id;
+  }
   return result;
+}
+
+function docKey(doc) {
+  return doc && (doc._id || doc.id);
+}
+
+function sameKey(a, b) {
+  return String(a || "") === String(b || "");
+}
+
+function uniqueValues(values) {
+  const seen = {};
+  return (values || [])
+    .filter((value) => value !== undefined && value !== null && String(value).trim() !== "")
+    .map((value) => String(value))
+    .filter((value) => {
+      if (seen[value]) return false;
+      seen[value] = true;
+      return true;
+    });
+}
+
+function anyFieldQuery(field, values) {
+  const ids = uniqueValues(values);
+  if (!ids.length) return { [field]: "__never__" };
+  if (ids.length === 1) return { [field]: ids[0] };
+  return { [field]: _.in(ids) };
+}
+
+function rawDocKeys(doc, fallback) {
+  if (!doc) return uniqueValues([fallback]);
+  return uniqueValues([doc._id, doc.id, doc.businessId, fallback]);
+}
+
+function stripPrivateDocFields(doc) {
+  const result = Object.assign({}, doc);
+  delete result._id;
+  delete result.id;
+  delete result.businessId;
+  return result;
+}
+
+async function findByAnyId(collection, id, limit) {
+  const value = String(id || "").trim();
+  if (!value) return [];
+  const result = await list(collection, _.or([{ _id: value }, { id: value }]), limit || 1);
+  return result;
+}
+
+async function findOneByAnyId(collection, id) {
+  return (await findByAnyId(collection, id, 1))[0] || null;
 }
 
 function safeAccount(account) {
@@ -53,7 +107,16 @@ async function getAccountByName(accountName) {
     account: rules.normalizeAccount(accountName),
     status: _.neq("disabled")
   }).limit(1).get();
-  return result.data[0] || null;
+  const account = result.data[0] || null;
+  if (!account) return null;
+  if (account.role === "student" && account.memberId) {
+    const member = await findOneByAnyId("members", account.memberId).catch(() => null);
+    if (member && member._id && account.memberId !== member._id) {
+      account.businessMemberId = account.memberId;
+      account.memberId = member._id;
+    }
+  }
+  return account;
 }
 
 async function getAccountBySession(session, wxContext) {
@@ -104,49 +167,116 @@ async function createCollectionIfNeeded(collection) {
 async function addRows(collection, rows) {
   if (!rows || !rows.length) return;
   await createCollectionIfNeeded(collection);
-  for (let index = 0; index < rows.length; index += 100) {
-    const part = rows.slice(index, index + 100);
-    try {
-      await db.collection(collection).add({ data: part });
-    } catch (error) {
-      if (!Array.isArray(part) || part.length === 1) throw error;
-      for (const row of part) {
-        await db.collection(collection).add({ data: row });
-      }
+  for (const row of rows) {
+    const docId = row._id || row.id;
+    const data = stripPrivateDocFields(row);
+    if (docId) {
+      await db.collection(collection).doc(docId).set({ data });
+    } else {
+      await db.collection(collection).add({ data });
     }
   }
+}
+
+const seedCollectionOrder = [
+  "accounts",
+  "courseProducts",
+  "members",
+  "schedules",
+  "attendanceLogs",
+  "availabilitySlots",
+  "bookingRequests",
+  "courseApplications",
+  "auditLogs"
+];
+
+function currentSeedVersion() {
+  if (!seedData) return "";
+  return seedData.seedVersion || "seed-" + String(seedData.source || "unknown");
+}
+
+async function hasSeedMarker(seedVersion) {
+  if (!seedVersion) return false;
+  const existing = await list("auditLogs", { action: "seed_applied", seedVersion }, 1).catch((error) => {
+    if (isMissingCollectionError(error)) return [];
+    throw error;
+  });
+  return existing.length > 0;
+}
+
+async function deleteCollectionRows(collection) {
+  await createCollectionIfNeeded(collection);
+  for (;;) {
+    const rows = await list(collection, {}, 100).catch((error) => {
+      if (isMissingCollectionError(error)) return [];
+      throw error;
+    });
+    if (!rows.length) return;
+    for (const row of rows) {
+      const key = docKey(row);
+      if (key) await db.collection(collection).doc(key).remove();
+    }
+  }
+}
+
+async function applySeedData(replaceExisting, seedVersion) {
+  if (replaceExisting) {
+    for (let index = seedCollectionOrder.length - 1; index >= 0; index -= 1) {
+      await deleteCollectionRows(seedCollectionOrder[index]);
+    }
+  }
+  for (const collection of seedCollectionOrder) {
+    await addRows(collection, seedData.collections[collection] || []);
+  }
+  await addRows("auditLogs", [
+    {
+      _id: "audit-seed-" + seedVersion.replace(/[^a-zA-Z0-9_-]/g, "-"),
+      action: "seed_applied",
+      seedVersion,
+      source: seedData.source || "",
+      stats: seedData.stats || {},
+      replaceExisting,
+      createdAt: nowIso()
+    }
+  ]);
 }
 
 async function bootstrapSeedIfNeeded(accountName, password) {
   if (accountName !== "yeats" || String(password || "") !== "1324") return;
   if (!seedData || !seedData.collections) return;
+  const seedVersion = currentSeedVersion();
+  if (await hasSeedMarker(seedVersion)) return;
   const existingAccounts = await countCollection("accounts");
-  if (existingAccounts > 0) return;
+  await applySeedData(existingAccounts > 0, seedVersion);
+}
 
-  const order = [
-    "accounts",
-    "courseProducts",
-    "members",
-    "schedules",
-    "attendanceLogs",
-    "availabilitySlots",
-    "bookingRequests",
-    "courseApplications",
-    "auditLogs"
-  ];
-  for (const collection of order) {
-    await addRows(collection, seedData.collections[collection] || []);
+async function repairStudentMemberLinks() {
+  const studentAccounts = await list("accounts", { role: "student" }, 1500);
+  for (const account of studentAccounts) {
+    if (!account.memberId) continue;
+    const linked = await findOneByAnyId("members", account.memberId);
+    if (!linked || linked._id === account.memberId) continue;
+    await db.collection("accounts").doc(docKey(account)).update({
+      data: {
+        memberId: docKey(linked),
+        businessMemberId: account.memberId,
+        updatedAt: nowIso()
+      }
+    });
   }
 }
 
 async function login(payload, wxContext) {
   const accountName = rules.normalizeAccount(payload.account);
+  await bootstrapSeedIfNeeded(accountName, payload.password);
   let account = await getAccountByName(accountName).catch(async (error) => {
     if (!isMissingCollectionError(error)) throw error;
     return null;
   });
   if (!account) {
-    await bootstrapSeedIfNeeded(accountName, payload.password);
+    if (accountName === "yeats" && String(payload.password || "") === "1324") {
+      await repairStudentMemberLinks();
+    }
     account = await getAccountByName(accountName).catch(async (error) => {
       if (!isMissingCollectionError(error)) throw error;
       return null;
@@ -178,22 +308,31 @@ async function login(payload, wxContext) {
 async function memberViews(viewer) {
   let memberQuery = {};
   if (viewer.role === "coach") memberQuery = { coach: viewer.coachName };
-  if (viewer.role === "student") memberQuery = { _id: viewer.memberId };
+  let members;
+  let memberKeys = [];
+  if (viewer.role === "student") {
+    const member = await findOneByAnyId("members", viewer.memberId);
+    members = member ? [member] : [];
+    memberKeys = rawDocKeys(member, viewer.memberId);
+  }
 
-  const [members, attendanceLogs] = await Promise.all([
-    list("members", memberQuery, 1500),
-    list("attendanceLogs", viewer.role === "student" ? { memberId: viewer.memberId } : {}, 1500)
+  const [loadedMembers, attendanceLogs] = await Promise.all([
+    members ? Promise.resolve(members) : list("members", memberQuery, 1500),
+    list("attendanceLogs", viewer.role === "student" ? anyFieldQuery("memberId", memberKeys) : {}, 1500)
   ]);
   const usedByMember = {};
   attendanceLogs.forEach((log) => {
     usedByMember[log.memberId] = (usedByMember[log.memberId] || 0) + Number(log.lessonsDeducted || 0);
   });
 
-  return members.map((member) => {
-    const balance = rules.memberStatus(member, usedByMember[member._id] || 0);
+  return loadedMembers.map((member) => {
+    const key = docKey(member);
+    const usedLessons = rawDocKeys(member).reduce((sum, id) => sum + Number(usedByMember[id] || 0), 0);
+    const balance = rules.memberStatus(member, usedLessons);
     return Object.assign({}, member, {
-      id: member._id,
-      usedLessons: usedByMember[member._id] || 0,
+      id: key,
+      businessId: member.id && member._id && member.id !== member._id ? member.id : member.businessId,
+      usedLessons,
       remainingLessons: balance.remaining,
       status: balance.status
     });
@@ -203,7 +342,10 @@ async function memberViews(viewer) {
 async function schedulesFor(viewer) {
   let query = {};
   if (viewer.role === "coach") query = { coach: viewer.coachName };
-  if (viewer.role === "student") query = { memberId: viewer.memberId };
+  if (viewer.role === "student") {
+    const member = await findOneByAnyId("members", viewer.memberId);
+    query = anyFieldQuery("memberId", rawDocKeys(member, viewer.memberId));
+  }
   const schedules = await list("schedules", query, 1500);
   return schedules.map(withId);
 }
@@ -212,7 +354,7 @@ async function availabilityFor(viewer) {
   let query = {};
   if (viewer.role === "coach") query = { coach: viewer.coachName };
   if (viewer.role === "student") {
-    const member = (await list("members", { _id: viewer.memberId }, 1))[0];
+    const member = await findOneByAnyId("members", viewer.memberId);
     query = {
       status: "published",
       slotDate: _.gte(rules.minStudentBookingDate())
@@ -224,24 +366,60 @@ async function availabilityFor(viewer) {
 }
 
 async function getHomeData(viewer) {
+  const studentMember = viewer.role === "student" ? await findOneByAnyId("members", viewer.memberId) : null;
+  const studentMemberKeys = rawDocKeys(studentMember, viewer.memberId);
   const [members, schedules, attendanceLogs, availabilitySlots, bookingRequests, courseApplications, courseProducts, accounts] =
     await Promise.all([
       memberViews(viewer),
       schedulesFor(viewer),
-      list("attendanceLogs", viewer.role === "student" ? { memberId: viewer.memberId } : viewer.role === "coach" ? { coach: viewer.coachName } : {}, 1500),
+      list(
+        "attendanceLogs",
+        viewer.role === "student" ? anyFieldQuery("memberId", studentMemberKeys) : viewer.role === "coach" ? { coach: viewer.coachName } : {},
+        1500
+      ),
       availabilityFor(viewer),
-      list("bookingRequests", viewer.role === "student" ? { memberId: viewer.memberId } : viewer.role === "coach" ? { coach: viewer.coachName } : {}, 1000),
-      list("courseApplications", viewer.role === "student" ? { memberId: viewer.memberId } : {}, 1000),
+      list(
+        "bookingRequests",
+        viewer.role === "student" ? anyFieldQuery("memberId", studentMemberKeys) : viewer.role === "coach" ? { coach: viewer.coachName } : {},
+        1000
+      ),
+      list("courseApplications", viewer.role === "student" ? anyFieldQuery("memberId", studentMemberKeys) : {}, 1000),
       list("courseProducts", {}, 200),
       viewer.role === "admin" ? list("accounts", {}, 1000) : []
     ]);
+
+  let visibleAvailabilitySlots = availabilitySlots;
+  if (viewer.role === "student" && availabilitySlots.length) {
+    const slotKeyValues = [];
+    availabilitySlots.forEach((slot) => {
+      rawDocKeys(slot).forEach((key) => slotKeyValues.push(key));
+    });
+    const slotKeys = uniqueValues(slotKeyValues);
+    const activeBookings = await list(
+      "bookingRequests",
+      Object.assign(anyFieldQuery("slotId", slotKeys), { status: _.in(["pending", "approved"]) }),
+      1500
+    );
+    const bookedBySlot = {};
+    activeBookings.forEach((booking) => {
+      bookedBySlot[booking.slotId] = (bookedBySlot[booking.slotId] || 0) + 1;
+    });
+    visibleAvailabilitySlots = availabilitySlots.map((slot) => {
+      const bookedCount = rawDocKeys(slot).reduce((sum, key) => sum + Number(bookedBySlot[key] || 0), 0);
+      const capacity = Number(slot.capacity || 1);
+      return Object.assign({}, slot, {
+        bookedCount,
+        left: Math.max(0, capacity - bookedCount)
+      });
+    });
+  }
 
   return {
     viewer: safeAccount(viewer),
     members,
     schedules,
     attendanceLogs: attendanceLogs.map(withId),
-    availabilitySlots,
+    availabilitySlots: visibleAvailabilitySlots,
     bookingRequests: bookingRequests.map(withId),
     courseApplications: courseApplications.map(withId),
     courseProducts: courseProducts.map(withId),
@@ -251,21 +429,25 @@ async function getHomeData(viewer) {
 
 async function createBookingRequest(viewer, payload) {
   assertRole(viewer, ["student"]);
-  const slot = (await list("availabilitySlots", { _id: payload.slotId }, 1))[0];
+  const slot = await findOneByAnyId("availabilitySlots", payload.slotId);
   if (!slot || slot.status !== "published") throw new Error("该时间暂不可预约");
   if (!rules.isBookableForStudent(slot.slotDate)) throw new Error("该时间不符合提前预约规则");
 
-  const member = (await list("members", { _id: viewer.memberId }, 1))[0];
+  const member = await findOneByAnyId("members", viewer.memberId);
   if (!member) throw new Error("找不到绑定学员");
   if (member.coach && member.coach !== slot.coach) throw new Error("该时间不属于你的绑定教练");
 
-  const active = await list("bookingRequests", { slotId: slot._id, status: _.in(["pending", "approved"]) }, 100);
+  const slotKeys = rawDocKeys(slot, payload.slotId);
+  const memberKeys = rawDocKeys(member, viewer.memberId);
+  const slotKey = docKey(slot);
+  const memberKey = docKey(member);
+  const active = await list("bookingRequests", Object.assign(anyFieldQuery("slotId", slotKeys), { status: _.in(["pending", "approved"]) }), 100);
   if (active.length >= Number(slot.capacity || 1)) throw new Error("该时间名额已满");
-  if (active.some((item) => item.memberId === viewer.memberId)) throw new Error("你已经提交过该时间的预约");
+  if (active.some((item) => memberKeys.some((key) => sameKey(item.memberId, key)))) throw new Error("你已经提交过该时间的预约");
 
   const request = {
-    slotId: slot._id,
-    memberId: member._id,
+    slotId: slotKey,
+    memberId: memberKey,
     memberName: member.chineseName,
     slotDate: slot.slotDate,
     slotTime: slot.slotTime,
@@ -321,13 +503,13 @@ async function saveMember(viewer, payload) {
   assertRole(viewer, ["admin"]);
   const raw = payload.member || payload;
   const id = String(raw.id || raw._id || "").trim();
-  const current = id ? (await list("members", { _id: id }, 1))[0] : null;
+  const current = id ? await findOneByAnyId("members", id) : null;
   const member = await memberPayload(raw, current);
   if (!member.chineseName) throw new Error("学员姓名不能为空");
 
   if (current) {
     delete member._id;
-    await db.collection("members").doc(id).update({ data: member });
+    await db.collection("members").doc(docKey(current)).update({ data: member });
     return { message: "学员已保存", member: withId(Object.assign({}, current, member)) };
   }
 
@@ -378,20 +560,20 @@ async function saveAccount(viewer, payload) {
   if (!role) throw new Error("账号必须是 yeats、jl 开头或 xy 开头");
 
   const id = String(raw.id || raw._id || "").trim();
-  const current = id ? (await list("accounts", { _id: id }, 1))[0] || null : null;
+  const current = id ? await findOneByAnyId("accounts", id) : null;
   if (current && current.account !== accountName) {
     throw new Error("已创建账号不能修改账号名，请新建账号");
   }
   const duplicates = await list("accounts", { account: accountName }, 10);
-  if (duplicates.some((item) => item._id !== id)) throw new Error("账号已存在");
+  if (duplicates.some((item) => !sameKey(docKey(item), id))) throw new Error("账号已存在");
 
   let memberId = raw.memberId || current && current.memberId || "";
   if (role === "student") {
     const memberName = String(raw.memberName || raw.fullName || "").trim();
-    const members = await list("members", memberId ? { _id: memberId } : { chineseName: memberName }, 10);
+    const members = memberId ? await findByAnyId("members", memberId, 10) : await list("members", { chineseName: memberName }, 10);
     const member = members[0];
     if (!member) throw new Error("学员账号需要填写已存在的学员姓名");
-    memberId = member._id;
+    memberId = docKey(member);
   }
 
   const account = {
@@ -412,7 +594,7 @@ async function saveAccount(viewer, payload) {
   }
 
   if (current) {
-    await db.collection("accounts").doc(current._id).update({ data: account });
+    await db.collection("accounts").doc(docKey(current)).update({ data: account });
     return { message: "账号已保存", account: safeAccount(Object.assign({}, current, account)) };
   }
 
@@ -426,8 +608,7 @@ async function resetAccountPassword(viewer, payload) {
   assertRole(viewer, ["admin"]);
   const id = String(payload.id || payload.accountId || "").trim();
   const accountName = rules.normalizeAccount(payload.account);
-  const accounts = await list("accounts", id ? { _id: id } : { account: accountName }, 1);
-  const account = accounts[0];
+  const account = id ? await findOneByAnyId("accounts", id) : (await list("accounts", { account: accountName }, 1))[0];
   if (!account) throw new Error("账号不存在");
   const passwordSalt = crypto.randomBytes(16).toString("hex");
   const plainPassword = defaultPasswordForRole(account.role);
@@ -461,9 +642,9 @@ async function changeMyPassword(viewer, payload) {
 
 async function approveBookingRequest(viewer, payload) {
   assertRole(viewer, ["admin"]);
-  const request = (await list("bookingRequests", { _id: payload.requestId }, 1))[0];
+  const request = await findOneByAnyId("bookingRequests", payload.requestId);
   if (!request || request.status !== "pending") throw new Error("该预约无法审批");
-  const slot = (await list("availabilitySlots", { _id: request.slotId }, 1))[0];
+  const slot = await findOneByAnyId("availabilitySlots", request.slotId);
   if (!slot) throw new Error("空余时间不存在");
 
   const schedule = {
@@ -480,7 +661,7 @@ async function approveBookingRequest(viewer, payload) {
     updatedAt: nowIso()
   };
   const result = await db.collection("schedules").add({ data: schedule });
-  await db.collection("bookingRequests").doc(request._id).update({
+  await db.collection("bookingRequests").doc(docKey(request)).update({
     data: {
       status: "approved",
       reviewedAt: nowIso(),
@@ -494,7 +675,9 @@ async function approveBookingRequest(viewer, payload) {
 
 async function rejectBookingRequest(viewer, payload) {
   assertRole(viewer, ["admin"]);
-  await db.collection("bookingRequests").doc(payload.requestId).update({
+  const request = await findOneByAnyId("bookingRequests", payload.requestId);
+  if (!request || request.status !== "pending") throw new Error("该预约无法拒绝");
+  await db.collection("bookingRequests").doc(docKey(request)).update({
     data: {
       status: "rejected",
       reviewedAt: nowIso(),
@@ -507,33 +690,34 @@ async function rejectBookingRequest(viewer, payload) {
 
 async function markAttendance(viewer, payload) {
   assertRole(viewer, ["admin", "coach"]);
-  const schedule = (await list("schedules", { _id: payload.scheduleId }, 1))[0];
+  const schedule = await findOneByAnyId("schedules", payload.scheduleId);
   if (!schedule) throw new Error("排课不存在");
   if (viewer.role === "coach" && schedule.coach !== viewer.coachName) throw new Error("只能确认自己的课程");
   if (schedule.lessonStatus === "completed") return { message: "该课程已经确认过出勤", schedule };
 
-  const existing = await list("attendanceLogs", { sourceScheduleId: schedule._id }, 1);
+  const scheduleKey = docKey(schedule);
+  const existing = await list("attendanceLogs", anyFieldQuery("sourceScheduleId", rawDocKeys(schedule, payload.scheduleId)), 1);
   if (existing.length) {
-    await db.collection("schedules").doc(schedule._id).update({ data: { attended: true, lessonStatus: "completed", updatedAt: nowIso() } });
+    await db.collection("schedules").doc(scheduleKey).update({ data: { attended: true, lessonStatus: "completed", updatedAt: nowIso() } });
     return { message: "该课程已经有消课记录，已同步为完成" };
   }
 
-  const member = (await list("members", { _id: schedule.memberId }, 1))[0];
+  const member = await findOneByAnyId("members", schedule.memberId);
   if (!member) throw new Error("学员不存在");
   const log = {
     attendanceDate: schedule.lessonDate,
-    memberId: member._id,
+    memberId: docKey(member),
     memberName: member.chineseName,
     coach: schedule.coach,
     campus: schedule.campus,
     lessonsDeducted: rules.lessonDeduction(member.productType),
-    sourceScheduleId: schedule._id,
+    sourceScheduleId: scheduleKey,
     source: "coach_checkin",
     sourceNote: "小程序确认出勤",
     createdAt: nowIso()
   };
   await db.collection("attendanceLogs").add({ data: log });
-  await db.collection("schedules").doc(schedule._id).update({ data: { attended: true, lessonStatus: "completed", updatedAt: nowIso() } });
+  await db.collection("schedules").doc(scheduleKey).update({ data: { attended: true, lessonStatus: "completed", updatedAt: nowIso() } });
   return { message: log.lessonsDeducted ? "已确认出勤并扣 1 课时" : "已确认出勤，该课程类型不扣课时", log };
 }
 
@@ -571,7 +755,9 @@ async function createAvailabilitySlots(viewer, payload) {
 
 async function publishAvailabilitySlot(viewer, payload) {
   assertRole(viewer, ["admin"]);
-  await db.collection("availabilitySlots").doc(payload.slotId).update({
+  const slot = await findOneByAnyId("availabilitySlots", payload.slotId);
+  if (!slot) throw new Error("空余时间不存在");
+  await db.collection("availabilitySlots").doc(docKey(slot)).update({
     data: {
       status: "published",
       publishOrder: Number(payload.publishOrder || 100),
@@ -584,7 +770,7 @@ async function publishAvailabilitySlot(viewer, payload) {
 async function createManualSchedule(viewer, payload) {
   assertRole(viewer, ["admin"]);
   const memberName = String(payload.memberName || "").trim();
-  const members = await list("members", payload.memberId ? { _id: payload.memberId } : { chineseName: memberName }, 1);
+  const members = payload.memberId ? await findByAnyId("members", payload.memberId, 1) : await list("members", { chineseName: memberName }, 1);
   const member = members[0];
   if (!member) throw new Error("找不到学员，请检查姓名");
   const schedule = {
@@ -592,7 +778,7 @@ async function createManualSchedule(viewer, payload) {
     lessonTime: String(payload.lessonTime || "").trim(),
     campus: String(payload.campus || member.campus || "").trim(),
     coach: String(payload.coach || member.coach || "").trim(),
-    memberId: member._id,
+    memberId: docKey(member),
     memberName: member.chineseName,
     attended: false,
     lessonStatus: "pending",
@@ -607,16 +793,16 @@ async function createManualSchedule(viewer, payload) {
 
 async function createCourseApplication(viewer, payload) {
   assertRole(viewer, ["student"]);
-  const [member, product] = await Promise.all([
-    list("members", { _id: viewer.memberId }, 1),
-    list("courseProducts", { _id: payload.productId }, 1)
-  ]);
-  if (!member[0] || !product[0]) throw new Error("申请信息不完整");
+  const member = await findOneByAnyId("members", viewer.memberId);
+  if (!member) throw new Error("找不到绑定学员");
+  let product = payload.productId ? await findOneByAnyId("courseProducts", payload.productId) : null;
+  if (!product && member.productId) product = await findOneByAnyId("courseProducts", member.productId);
+  if (!product) product = (await list("courseProducts", {}, 1))[0] || null;
   const application = {
-    memberId: member[0]._id,
-    memberName: member[0].chineseName,
-    productId: product[0]._id,
-    productName: product[0].name,
+    memberId: docKey(member),
+    memberName: member.chineseName,
+    productId: product ? docKey(product) : member.productId || "",
+    productName: product ? product.name : member.productName || "课程申请",
     status: "pending",
     note: String(payload.note || "").trim(),
     createdAt: nowIso(),

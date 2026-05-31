@@ -121,7 +121,7 @@ async function uploadFunction() {
     env,
     name,
     path: functionPath,
-    remoteNpmInstall: true
+    remoteNpmInstall: getArg("remote-npm", "false") === "true"
   });
 
   console.log("Cloud function uploaded:", result);

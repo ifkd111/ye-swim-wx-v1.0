@@ -3,21 +3,22 @@
 }
 
 .chip-list {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
+  flex-wrap: wrap;
   gap: 14rpx;
 }
 
 .chip {
+  width: calc((100% - 14rpx) / 2);
   min-height: 76rpx;
   display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 999rpx;
   padding: 0 20rpx;
-  background: #13223a;
-  border: 1rpx solid #243953;
-  color: #f8fbff;
+  background: #eef6ff;
+  border: 1rpx solid #d5e7fb;
+  color: #12325b;
   font-weight: 800;
   font-size: 24rpx;
 }
@@ -45,7 +46,7 @@
 
 .template-row {
   padding: 18rpx 0;
-  border-top: 1rpx solid #17263d;
+  border-top: 1rpx solid #e1ebf8;
 }
 
 .template-row:first-child {
@@ -54,26 +55,37 @@
 }
 
 .template-fields {
-  display: grid;
-  grid-template-columns: 180rpx minmax(0, 1fr);
+  display: flex;
+  flex-wrap: wrap;
   gap: 12rpx;
 }
 
+.template-fields input:first-child {
+  width: 180rpx;
+}
+
+.template-fields input:last-child {
+  flex: 1;
+  min-width: 260rpx;
+}
+
 .template-actions {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  display: flex;
   gap: 12rpx;
   margin-top: 12rpx;
 }
 
 .template-actions button,
 .add-template button {
-  width: 100%;
+  flex: 1;
 }
 
 .add-template {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 140rpx;
+  display: flex;
   gap: 12rpx;
   align-items: center;
+}
+
+.add-template .template-fields {
+  flex: 1;
 }
