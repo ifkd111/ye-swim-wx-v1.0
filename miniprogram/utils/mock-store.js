@@ -542,6 +542,8 @@ function approveBookingRequest(state, viewer, payload) {
 
   const activeCount = state.bookingRequests.filter((item) => item.slotId === slot.id && item.status === "approved").length;
   if (activeCount >= Number(slot.capacity || 1)) throw new Error("该时间名额已满");
+  const duplicated = state.schedules.some((item) => item.memberId === request.memberId && item.lessonDate === slot.slotDate && item.lessonTime === slot.slotTime && item.lessonStatus !== "cancelled");
+  if (duplicated) throw new Error("该学员该时间已有排课");
 
   const schedule = {
     id: newId("schedule"),
@@ -567,8 +569,27 @@ function rejectBookingRequest(state, viewer, payload) {
   const request = state.bookingRequests.find((item) => item.id === payload.requestId);
   if (!request || request.status !== "pending") throw new Error("该预约无法拒绝");
   request.status = "rejected";
+  request.rejectReason = String(payload.reason || "").trim();
   request.reviewedAt = new Date().toISOString();
   return { message: "已拒绝预约", request };
+}
+
+function cancelBookingRequest(state, viewer, payload) {
+  const request = state.bookingRequests.find((item) => item.id === payload.requestId);
+  if (!request) throw new Error("预约不存在");
+  if (viewer.role === "student") {
+    if (request.memberId !== viewer.memberId) throw new Error("只能取消自己的预约");
+    if (request.status !== "pending") throw new Error("已通过的预约请联系老板取消");
+    request.status = "cancelled_by_student";
+  } else {
+    assertRole(viewer, ["admin"]);
+    if (request.status !== "pending") throw new Error("只能取消待审批预约");
+    request.status = "cancelled_by_admin";
+    request.cancelledBy = viewer.account;
+  }
+  request.cancelReason = String(payload.reason || "").trim();
+  request.cancelledAt = new Date().toISOString();
+  return { message: "已取消预约", request };
 }
 
 function markAttendance(state, viewer, payload) {
@@ -667,6 +688,18 @@ function createManualSchedule(state, viewer, payload) {
   return { message: "管理员手动排课已创建", schedule };
 }
 
+function cancelSchedule(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const schedule = state.schedules.find((item) => item.id === payload.scheduleId);
+  if (!schedule) throw new Error("排课不存在");
+  if (schedule.lessonStatus === "completed") throw new Error("已完成课程不能直接取消，请先走撤销消课");
+  schedule.lessonStatus = "cancelled";
+  schedule.cancelReason = String(payload.reason || "").trim();
+  schedule.cancelledAt = new Date().toISOString();
+  schedule.cancelledBy = viewer.account;
+  return { message: "排课已取消", schedule };
+}
+
 function createCourseApplication(state, viewer, payload) {
   assertRole(viewer, ["student"]);
   const member = state.members.find((item) => item.id === viewer.memberId);
@@ -684,6 +717,35 @@ function createCourseApplication(state, viewer, payload) {
   };
   state.courseApplications.push(application);
   return { message: "课程申请已提交，等待管理员处理", application };
+}
+
+function approveCourseApplication(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const application = state.courseApplications.find((item) => item.id === payload.applicationId);
+  if (!application || application.status !== "pending") throw new Error("该课程申请无法处理");
+  const member = state.members.find((item) => item.id === application.memberId);
+  if (!member) throw new Error("找不到申请学员");
+  const product = state.courseProducts.find((item) => item.id === application.productId) || {};
+  member.productId = product.id || application.productId || member.productId;
+  member.productName = product.name || application.productName || member.productName;
+  member.productType = product.type || member.productType || "class_pack";
+  member.totalLessons = Number(payload.totalLessons || product.totalLessons || member.totalLessons || 0);
+  member.updatedAt = new Date().toISOString();
+  application.status = "approved";
+  application.reviewedAt = new Date().toISOString();
+  application.reviewedBy = viewer.account;
+  return { message: "已通过课程申请并更新学员课程", application, member };
+}
+
+function rejectCourseApplication(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const application = state.courseApplications.find((item) => item.id === payload.applicationId);
+  if (!application || application.status !== "pending") throw new Error("该课程申请无法处理");
+  application.status = "rejected";
+  application.rejectReason = String(payload.reason || "").trim();
+  application.reviewedAt = new Date().toISOString();
+  application.reviewedBy = viewer.account;
+  return { message: "已拒绝课程申请", application };
 }
 
 function call(action, payload) {
@@ -709,7 +771,11 @@ function call(action, payload) {
   else if (action === "createBookingRequest") result = createBookingRequest(state, viewer, payload);
   else if (action === "approveBookingRequest") result = approveBookingRequest(state, viewer, payload);
   else if (action === "rejectBookingRequest") result = rejectBookingRequest(state, viewer, payload);
+  else if (action === "cancelBookingRequest") result = cancelBookingRequest(state, viewer, payload);
   else if (action === "markAttendance") result = markAttendance(state, viewer, payload);
+  else if (action === "cancelSchedule") result = cancelSchedule(state, viewer, payload);
+  else if (action === "approveCourseApplication") result = approveCourseApplication(state, viewer, payload);
+  else if (action === "rejectCourseApplication") result = rejectCourseApplication(state, viewer, payload);
   else if (action === "createAvailabilitySlot") result = createAvailabilitySlot(state, viewer, payload);
   else if (action === "createAvailabilitySlots") result = createAvailabilitySlots(state, viewer, payload);
   else if (action === "publishAvailabilitySlot") result = publishAvailabilitySlot(state, viewer, payload);

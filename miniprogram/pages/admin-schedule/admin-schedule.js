@@ -36,5 +36,26 @@ Page({
         this.load();
       })
       .catch(api.fail);
+  },
+
+  cancel(event) {
+    const scheduleId = event.currentTarget.dataset.id;
+    wx.showModal({
+      title: "取消排课",
+      editable: true,
+      placeholderText: "填写取消原因",
+      confirmText: "确认取消",
+      success: (res) => {
+        if (!res.confirm) return;
+        api.syncing("正在取消");
+        api
+          .call("cancelSchedule", { scheduleId, reason: res.content || "" })
+          .then((result) => {
+            api.done(result.message);
+            this.load();
+          })
+          .catch(api.fail);
+      }
+    });
   }
 });

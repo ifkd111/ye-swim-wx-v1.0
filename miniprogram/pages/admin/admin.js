@@ -16,10 +16,12 @@ Page({
       const today = new Date().toISOString().slice(0, 10);
       const accounts = data.accounts || [];
       const pendingBookings = (data.bookingRequests || []).filter((item) => item.status === "pending");
+      const pendingApplications = (data.courseApplications || []).filter((item) => item.status === "pending");
       this.setData({
         pendingBookings: pendingBookings.slice(0, 5),
         stats: {
           pendingBookings: pendingBookings.length,
+          pendingApplications: pendingApplications.length,
           todaySchedules: (data.schedules || []).filter((item) => item.lessonDate === today).length,
           members: (data.members || []).length,
           coaches: accounts.filter((item) => item.role === "coach").length

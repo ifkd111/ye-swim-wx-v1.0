@@ -40,8 +40,9 @@
             <view class="name">{{item.memberName}}</view>
             <view class="meta">{{item.lessonDate}} {{item.lessonTime}} · {{item.campus}} · {{item.coach}}</view>
           </view>
-          <text class="badge {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待上课'}}</text>
+          <text class="badge {{item.lessonStatus === 'completed' ? '' : item.lessonStatus === 'cancelled' ? 'danger' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : item.lessonStatus === 'cancelled' ? '已取消' : '待上课'}}</text>
         </view>
+        <button wx:if="{{item.lessonStatus !== 'completed' && item.lessonStatus !== 'cancelled'}}" class="mini danger" data-id="{{item.id}}" bindtap="cancel">取消排课</button>
       </view>
     </block>
     <view wx:else class="empty">暂无排课</view>

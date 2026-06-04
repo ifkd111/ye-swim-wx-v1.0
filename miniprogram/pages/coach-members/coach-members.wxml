@@ -7,7 +7,11 @@
   </view>
 
   <view class="card">
-    <view class="card-title">共 {{members.length}} 位</view>
+    <view class="card-title">共 {{members.length}} / {{allMembers.length}} 位</view>
+    <view class="field">
+      <text class="field-label">搜索筛选</text>
+      <input value="{{keyword}}" placeholder="按姓名、手机号、校区、备注搜索" bindinput="search" />
+    </view>
     <block wx:if="{{members.length}}">
       <view class="list-item" wx:for="{{members}}" wx:key="id">
         <view class="row">

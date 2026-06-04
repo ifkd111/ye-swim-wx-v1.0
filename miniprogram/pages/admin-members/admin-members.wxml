@@ -48,6 +48,11 @@
   </view>
 
   <view class="card">
+    <view class="field">
+      <text class="field-label">搜索筛选</text>
+      <input value="{{keyword}}" placeholder="按姓名、手机号、教练、校区、备注搜索" bindinput="search" />
+    </view>
+    <view class="meta">当前显示 {{members.length}} / {{allMembers.length}} 位</view>
     <block wx:if="{{members.length}}">
       <view class="list-item tappable" wx:for="{{members}}" wx:key="id" bindtap="editMember" data-id="{{item.id}}">
         <view class="row">

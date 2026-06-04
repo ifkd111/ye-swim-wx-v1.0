@@ -1,9 +1,10 @@
 const api = require("../../utils/api");
+const env = require("../../env");
 
 Page({
   data: {
-    account: "yeats",
-    password: "1324",
+    account: env.useMock ? "yeats" : "",
+    password: env.useMock ? "1324" : "",
     loading: false
   },
 

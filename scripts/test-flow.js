@@ -94,6 +94,37 @@ function main() {
     note: "流程测试续课"
   }).application;
   assert.strictEqual(application.status, "pending", "学员课程申请失败");
+  const approvedApplication = call(admin, "approveCourseApplication", {
+    applicationId: application.id,
+    totalLessons: 30
+  }).application;
+  assert.strictEqual(approvedApplication.status, "approved", "老板应能通过课程申请");
+  assert.strictEqual(
+    call(student, "getHomeData").members[0].totalLessons,
+    30,
+    "课程申请通过后应更新学员课时"
+  );
+
+  const cancelSlot = call(coach, "createAvailabilitySlot", {
+    slotDate: "2026-06-06",
+    slotTime: "18:00-19:00",
+    campus: "绿洲",
+    capacity: 1
+  }).slot;
+  call(admin, "publishAvailabilitySlot", { slotId: cancelSlot.id });
+  const cancelBooking = call(student, "createBookingRequest", { slotId: cancelSlot.id }).request;
+  const cancelledBooking = call(student, "cancelBookingRequest", { requestId: cancelBooking.id, reason: "点错时间" }).request;
+  assert.strictEqual(cancelledBooking.status, "cancelled_by_student", "学员应能取消待审批预约");
+
+  const manual = call(admin, "createManualSchedule", {
+    lessonDate: "2026-06-07",
+    lessonTime: "17:00-18:00",
+    campus: "绿洲",
+    coach: "绿洲教练",
+    memberName: "白卓可"
+  }).schedule;
+  const cancelledSchedule = call(admin, "cancelSchedule", { scheduleId: manual.id, reason: "测试取消" }).schedule;
+  assert.strictEqual(cancelledSchedule.lessonStatus, "cancelled", "老板应能取消未完成排课");
 
   const studentRecords = call(student, "getHomeData");
   assert(studentRecords.bookingRequests.length >= 1, "学员应看到预约记录");

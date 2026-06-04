@@ -15,6 +15,8 @@ const emptyForm = {
 Page({
   data: {
     members: [],
+    allMembers: [],
+    keyword: "",
     form: Object.assign({}, emptyForm)
   },
 
@@ -25,12 +27,27 @@ Page({
 
   load() {
     api.call("getHomeData").then((data) => {
-      this.setData({ members: data.members || [] });
+      const members = data.members || [];
+      this.setData({ allMembers: members }, () => this.applyFilter());
     });
   },
 
   input(event) {
     this.setData({ ["form." + event.currentTarget.dataset.field]: event.detail.value });
+  },
+
+  search(event) {
+    this.setData({ keyword: event.detail.value }, () => this.applyFilter());
+  },
+
+  applyFilter() {
+    const keyword = String(this.data.keyword || "").trim().toLowerCase();
+    const members = (this.data.allMembers || []).filter((item) => {
+      if (!keyword) return true;
+      return [item.chineseName, item.phone, item.campus, item.coach, item.productName, item.notes, item.memberNo]
+        .some((value) => String(value || "").toLowerCase().indexOf(keyword) >= 0);
+    });
+    this.setData({ members });
   },
 
   editMember(event) {

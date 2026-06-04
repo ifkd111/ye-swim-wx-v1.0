@@ -655,7 +655,17 @@ async function approveBookingRequest(viewer, payload) {
   const request = await findOneByAnyId("bookingRequests", payload.requestId);
   if (!request || request.status !== "pending") throw new Error("该预约无法审批");
   const slot = await findOneByAnyId("availabilitySlots", request.slotId);
-  if (!slot) throw new Error("空余时间不存在");
+  if (!slot || slot.status !== "published") throw new Error("空余时间不存在或未发布");
+  const slotKeys = rawDocKeys(slot, request.slotId);
+  const approvedRequests = await list("bookingRequests", Object.assign(anyFieldQuery("slotId", slotKeys), { status: "approved" }), 200);
+  if (approvedRequests.length >= Number(slot.capacity || 1)) throw new Error("该时间名额已满");
+  const duplicateSchedules = await list("schedules", {
+    lessonDate: slot.slotDate,
+    lessonTime: slot.slotTime,
+    memberId: request.memberId,
+    lessonStatus: _.neq("cancelled")
+  }, 10);
+  if (duplicateSchedules.length) throw new Error("该学员该时间已有排课");
 
   const schedule = {
     lessonDate: slot.slotDate,
@@ -692,10 +702,43 @@ async function rejectBookingRequest(viewer, payload) {
       status: "rejected",
       reviewedAt: nowIso(),
       reviewedBy: viewer.account,
+      rejectReason: String(payload.reason || "").trim(),
       updatedAt: nowIso()
     }
   });
   return { message: "已拒绝预约" };
+}
+
+async function cancelBookingRequest(viewer, payload) {
+  const request = await findOneByAnyId("bookingRequests", payload.requestId);
+  if (!request) throw new Error("预约不存在");
+  if (viewer.role === "student") {
+    const member = await findOneByAnyId("members", viewer.memberId);
+    const memberKeys = rawDocKeys(member, viewer.memberId);
+    if (!memberKeys.some((key) => sameKey(key, request.memberId))) throw new Error("只能取消自己的预约");
+    if (request.status !== "pending") throw new Error("已通过的预约请联系老板取消");
+    await db.collection("bookingRequests").doc(docKey(request)).update({
+      data: {
+        status: "cancelled_by_student",
+        cancelReason: String(payload.reason || "").trim(),
+        cancelledAt: nowIso(),
+        updatedAt: nowIso()
+      }
+    });
+    return { message: "已取消预约", request: withId(Object.assign({}, request, { status: "cancelled_by_student" })) };
+  }
+  assertRole(viewer, ["admin"]);
+  if (request.status !== "pending") throw new Error("只能取消待审批预约");
+  await db.collection("bookingRequests").doc(docKey(request)).update({
+    data: {
+      status: "cancelled_by_admin",
+      cancelReason: String(payload.reason || "").trim(),
+      cancelledAt: nowIso(),
+      cancelledBy: viewer.account,
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "已取消预约", request: withId(Object.assign({}, request, { status: "cancelled_by_admin" })) };
 }
 
 async function markAttendance(viewer, payload) {
@@ -801,6 +844,23 @@ async function createManualSchedule(viewer, payload) {
   return { message: "管理员手动排课已创建", schedule: Object.assign({ id: result._id }, schedule) };
 }
 
+async function cancelSchedule(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const schedule = await findOneByAnyId("schedules", payload.scheduleId);
+  if (!schedule) throw new Error("排课不存在");
+  if (schedule.lessonStatus === "completed") throw new Error("已完成课程不能直接取消，请先走撤销消课");
+  await db.collection("schedules").doc(docKey(schedule)).update({
+    data: {
+      lessonStatus: "cancelled",
+      cancelReason: String(payload.reason || "").trim(),
+      cancelledAt: nowIso(),
+      cancelledBy: viewer.account,
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "排课已取消", schedule: withId(Object.assign({}, schedule, { lessonStatus: "cancelled" })) };
+}
+
 async function createCourseApplication(viewer, payload) {
   assertRole(viewer, ["student"]);
   const member = await findOneByAnyId("members", viewer.memberId);
@@ -820,6 +880,48 @@ async function createCourseApplication(viewer, payload) {
   };
   await db.collection("courseApplications").add({ data: application });
   return { message: "课程申请已提交，等待管理员处理", application };
+}
+
+async function approveCourseApplication(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const application = await findOneByAnyId("courseApplications", payload.applicationId);
+  if (!application || application.status !== "pending") throw new Error("该课程申请无法处理");
+  const member = await findOneByAnyId("members", application.memberId);
+  if (!member) throw new Error("找不到申请学员");
+  const product = application.productId ? await findOneByAnyId("courseProducts", application.productId) : null;
+  const patchData = {
+    productId: product ? docKey(product) : application.productId || member.productId || "",
+    productName: product ? product.name : application.productName || member.productName || "课程",
+    productType: product ? product.type : member.productType || "class_pack",
+    totalLessons: Number(payload.totalLessons || product && product.totalLessons || member.totalLessons || 0),
+    updatedAt: nowIso()
+  };
+  await db.collection("members").doc(docKey(member)).update({ data: patchData });
+  await db.collection("courseApplications").doc(docKey(application)).update({
+    data: {
+      status: "approved",
+      reviewedAt: nowIso(),
+      reviewedBy: viewer.account,
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "已通过课程申请并更新学员课程", application: withId(Object.assign({}, application, { status: "approved" })) };
+}
+
+async function rejectCourseApplication(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const application = await findOneByAnyId("courseApplications", payload.applicationId);
+  if (!application || application.status !== "pending") throw new Error("该课程申请无法处理");
+  await db.collection("courseApplications").doc(docKey(application)).update({
+    data: {
+      status: "rejected",
+      rejectReason: String(payload.reason || "").trim(),
+      reviewedAt: nowIso(),
+      reviewedBy: viewer.account,
+      updatedAt: nowIso()
+    }
+  });
+  return { message: "已拒绝课程申请", application: withId(Object.assign({}, application, { status: "rejected" })) };
 }
 
 exports.main = async (event) => {
@@ -846,7 +948,11 @@ exports.main = async (event) => {
       createBookingRequest,
       approveBookingRequest,
       rejectBookingRequest,
+      cancelBookingRequest,
       markAttendance,
+      cancelSchedule,
+      approveCourseApplication,
+      rejectCourseApplication,
       createAvailabilitySlot,
       createAvailabilitySlots,
       publishAvailabilitySlot,

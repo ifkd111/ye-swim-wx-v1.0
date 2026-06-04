@@ -3,6 +3,7 @@
     "pages/login/login",
     "pages/admin/admin",
     "pages/admin-bookings/admin-bookings",
+    "pages/admin-course-applications/admin-course-applications",
     "pages/admin-schedule/admin-schedule",
     "pages/admin-members/admin-members",
     "pages/admin-import/admin-import",

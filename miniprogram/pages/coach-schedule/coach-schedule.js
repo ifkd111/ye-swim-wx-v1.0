@@ -79,13 +79,24 @@ Page({
   },
 
   mark(event) {
-    api.syncing("正在确认");
-    api
-      .call("markAttendance", { scheduleId: event.currentTarget.dataset.id })
-      .then((result) => {
-        api.done(result.message);
-        this.load();
-      })
-      .catch(api.fail);
+    const scheduleId = event.currentTarget.dataset.id;
+    const schedule = (this.data.schedules || this.data.visibleSchedules || []).find((item) => item.id === scheduleId) ||
+      (this.data.weekSchedules || []).find((item) => item.id === scheduleId) || {};
+    wx.showModal({
+      title: "确认出勤",
+      content: [schedule.memberName || "该学员", (schedule.lessonDate || "") + " " + (schedule.lessonTime || ""), "确认后将按课程类型扣课。"].join("\n"),
+      confirmText: "确认出勤",
+      success: (res) => {
+        if (!res.confirm) return;
+        api.syncing("正在确认");
+        api
+          .call("markAttendance", { scheduleId })
+          .then((result) => {
+            api.done(result.message);
+            this.load();
+          })
+          .catch(api.fail);
+      }
+    });
   }
 });

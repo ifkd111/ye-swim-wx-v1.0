@@ -6,7 +6,9 @@ Page({
     statusText: {
       pending: "待审批",
       approved: "已通过",
-      rejected: "已拒绝"
+      rejected: "已拒绝",
+      cancelled_by_student: "学员取消",
+      cancelled_by_admin: "已取消"
     }
   },
 
@@ -27,6 +29,10 @@ Page({
 
   reject(event) {
     this.submit("rejectBookingRequest", event.currentTarget.dataset.id);
+  },
+
+  cancel(event) {
+    this.submit("cancelBookingRequest", event.currentTarget.dataset.id);
   },
 
   submit(action, requestId) {

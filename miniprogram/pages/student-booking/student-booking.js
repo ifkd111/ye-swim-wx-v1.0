@@ -29,7 +29,9 @@ Page({
     statusText: {
       pending: "待审批",
       approved: "已通过",
-      rejected: "已拒绝"
+      rejected: "已拒绝",
+      cancelled_by_student: "学员取消",
+      cancelled_by_admin: "已取消"
     }
   },
 
@@ -108,5 +110,25 @@ Page({
         this.load();
       })
       .catch(api.fail);
+  },
+
+  cancelBooking(event) {
+    const requestId = event.currentTarget.dataset.id;
+    wx.showModal({
+      title: "取消预约",
+      content: "确认取消这个待审批预约？",
+      confirmText: "取消预约",
+      success: (res) => {
+        if (!res.confirm) return;
+        api.syncing("正在取消");
+        api
+          .call("cancelBookingRequest", { requestId, reason: "学员自行取消" })
+          .then((result) => {
+            api.done(result.message);
+            this.load();
+          })
+          .catch(api.fail);
+      }
+    });
   }
 });

@@ -16,6 +16,11 @@
       <text class="metric-label">待审批预约</text>
       <text class="metric-action">点我审批</text>
     </view>
+    <view class="metric tappable" bindtap="go" data-url="/pages/admin-course-applications/admin-course-applications">
+      <text class="metric-value">{{stats.pendingApplications}}</text>
+      <text class="metric-label">课程申请</text>
+      <text class="metric-action">处理续课</text>
+    </view>
     <view class="metric tappable" bindtap="go" data-url="/pages/admin-schedule/admin-schedule">
       <text class="metric-value">{{stats.todaySchedules}}</text>
       <text class="metric-label">今日课程</text>
@@ -39,6 +44,10 @@
       <view class="nav-card" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
         <text class="nav-title">预约审批</text>
         <text class="nav-meta">通过后生成排课</text>
+      </view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-course-applications/admin-course-applications">
+        <text class="nav-title">课程申请</text>
+        <text class="nav-meta">处理学员续课</text>
       </view>
       <view class="nav-card" bindtap="go" data-url="/pages/admin-schedule/admin-schedule">
         <text class="nav-title">排课</text>

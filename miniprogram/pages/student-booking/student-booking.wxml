@@ -56,8 +56,9 @@
             <view class="name">{{item.slotDate}} {{item.slotTime}}</view>
             <view class="meta">{{item.coach}} · {{item.campus}}</view>
           </view>
-          <text class="badge {{item.status === 'pending' ? 'warn' : item.status === 'rejected' ? 'danger' : ''}}">{{statusText[item.status]}}</text>
+          <text class="badge {{item.status === 'pending' ? 'warn' : item.status === 'rejected' || item.status.indexOf('cancelled') === 0 ? 'danger' : ''}}">{{statusText[item.status] || '已取消'}}</text>
         </view>
+        <button wx:if="{{item.status === 'pending'}}" class="mini danger" data-id="{{item.id}}" catchtap="cancelBooking">取消预约</button>
       </view>
     </block>
     <view wx:else class="empty">暂无预约记录</view>
