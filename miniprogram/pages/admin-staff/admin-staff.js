@@ -98,7 +98,7 @@ Page({
     if (!this.data.form.id) return;
     wx.showModal({
       title: "重置密码",
-      content: "确认重置该账号密码？管理员默认 1324，教练/学员默认 1234。",
+      content: "确认将该账号密码重置为系统默认密码？",
       success: (modal) => {
         if (!modal.confirm) return;
         api.syncing("正在重置");

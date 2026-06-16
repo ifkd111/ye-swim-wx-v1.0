@@ -11,11 +11,11 @@
 
     <view class="field">
       <text class="field-label">账号</text>
-      <input value="{{account}}" placeholder="yeats / jl001 / xy001" bindinput="onAccountInput" />
+      <input value="{{account}}" placeholder="请输入管理员、教练或学员账号" bindinput="onAccountInput" />
     </view>
     <view class="field">
       <text class="field-label">密码</text>
-      <input password value="{{password}}" placeholder="管理员 1324，教练/学员 1234" bindinput="onPasswordInput" />
+      <input password value="{{password}}" placeholder="请输入密码" bindinput="onPasswordInput" />
     </view>
 
     <button class="primary login-button" loading="{{loading}}" bindtap="login">登录并绑定微信</button>

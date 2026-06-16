@@ -14,6 +14,7 @@ global.wx = {
 };
 
 const mock = require("../miniprogram/utils/mock-store");
+const rules = require("../miniprogram/utils/rules");
 
 function login(account, password) {
   return mock.call("login", { account, password, openid: "flow-" + account }).session;
@@ -21,6 +22,13 @@ function login(account, password) {
 
 function call(session, action, payload) {
   return mock.call(action, Object.assign({}, payload || {}, { session }));
+}
+
+function futureDate(extraDays) {
+  const parts = rules.minStudentBookingDate().split("-").map(Number);
+  const date = new Date(parts[0], parts[1] - 1, parts[2]);
+  date.setDate(date.getDate() + extraDays);
+  return rules.formatDateChina(date);
 }
 
 function main() {
@@ -63,7 +71,7 @@ function main() {
   call(admin, "resetAccountPassword", { id: newAccount.id });
 
   const availability = call(coach, "createAvailabilitySlot", {
-    slotDate: "2026-06-05",
+    slotDate: futureDate(1),
     slotTime: "17:00-18:00",
     campus: "绿洲",
     capacity: 2
@@ -106,7 +114,7 @@ function main() {
   );
 
   const cancelSlot = call(coach, "createAvailabilitySlot", {
-    slotDate: "2026-06-06",
+    slotDate: futureDate(2),
     slotTime: "18:00-19:00",
     campus: "绿洲",
     capacity: 1
@@ -117,7 +125,7 @@ function main() {
   assert.strictEqual(cancelledBooking.status, "cancelled_by_student", "学员应能取消待审批预约");
 
   const manual = call(admin, "createManualSchedule", {
-    lessonDate: "2026-06-07",
+    lessonDate: futureDate(3),
     lessonTime: "17:00-18:00",
     campus: "绿洲",
     coach: "绿洲教练",

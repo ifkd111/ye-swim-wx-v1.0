@@ -457,7 +457,7 @@ function resetAccountPassword(state, viewer, payload) {
   if (!account) throw new Error("账号不存在");
   account.password = defaultPasswordForRole(account.role);
   account.updatedAt = new Date().toISOString();
-  return { message: "密码已重置为 " + account.password, account: safeAccount(account) };
+  return { message: "密码已重置为系统默认密码", account: safeAccount(account) };
 }
 
 function changeMyPassword(state, viewer, payload) {

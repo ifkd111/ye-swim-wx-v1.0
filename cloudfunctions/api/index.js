@@ -629,7 +629,7 @@ async function resetAccountPassword(viewer, payload) {
       updatedAt: nowIso()
     }
   });
-  return { message: "密码已重置为 " + plainPassword, account: safeAccount(account) };
+  return { message: "密码已重置为系统默认密码", account: safeAccount(account) };
 }
 
 async function changeMyPassword(viewer, payload) {

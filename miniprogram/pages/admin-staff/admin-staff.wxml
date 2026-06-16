@@ -16,7 +16,7 @@
       </view>
       <view class="field">
         <text class="field-label">密码</text>
-        <input password value="{{form.password}}" placeholder="教练/学员默认 1234，修改留空" bindinput="input" data-field="password" />
+        <input password value="{{form.password}}" placeholder="留空则使用系统默认密码" bindinput="input" data-field="password" />
       </view>
       <view class="field">
         <text class="field-label">备注名</text>
