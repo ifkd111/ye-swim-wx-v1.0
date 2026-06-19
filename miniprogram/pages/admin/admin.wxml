@@ -2,11 +2,22 @@
   <view class="topbar">
     <view>
       <view class="title">老板工作台</view>
-      <view class="subtitle">预约审批、排课、学员与账号</view>
+      <view class="subtitle">今天先处理审批、续课、低课时和现场课程</view>
     </view>
     <view class="top-actions">
       <button class="mini" bindtap="changePassword">改密码</button>
       <button bindtap="logout">退出</button>
+    </view>
+  </view>
+
+  <view class="card hero-card">
+    <view class="card-title">今日待办</view>
+    <view class="nav-list">
+      <view class="nav-card tappable" wx:for="{{todoCards}}" wx:key="title" bindtap="go" data-url="{{item.url}}">
+        <text class="metric-value {{item.level === 'danger' ? 'text-danger' : item.level === 'warn' ? 'text-warn' : ''}}">{{item.value}}</text>
+        <text class="nav-title">{{item.title}}</text>
+        <text class="nav-meta">{{item.desc}}</text>
+      </view>
     </view>
   </view>
 
@@ -26,67 +37,40 @@
       <text class="metric-label">今日课程</text>
       <text class="metric-action">查看和排课</text>
     </view>
-    <view class="metric tappable" bindtap="go" data-url="/pages/admin-members/admin-members">
-      <text class="metric-value">{{stats.members}}</text>
-      <text class="metric-label">学员</text>
-      <text class="metric-action">新增和修改</text>
-    </view>
-    <view class="metric tappable" bindtap="go" data-url="/pages/admin-staff/admin-staff">
-      <text class="metric-value">{{stats.coaches}}</text>
-      <text class="metric-label">教练账号</text>
-      <text class="metric-action">账号管理</text>
+    <view class="metric tappable" bindtap="go" data-url="/pages/admin-members/admin-members?filter=low">
+      <text class="metric-value">{{stats.lowBalance}}</text>
+      <text class="metric-label">低课时风险</text>
+      <text class="metric-action">跟进续费</text>
     </view>
   </view>
 
   <view class="card">
     <view class="card-title">常用功能</view>
     <view class="nav-list">
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
-        <text class="nav-title">预约审批</text>
-        <text class="nav-meta">通过后生成排课</text>
-      </view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-course-applications/admin-course-applications">
-        <text class="nav-title">课程申请</text>
-        <text class="nav-meta">处理学员续课</text>
-      </view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-schedule/admin-schedule">
-        <text class="nav-title">排课</text>
-        <text class="nav-meta">特殊情况手动安排</text>
-      </view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-availability/admin-availability">
-        <text class="nav-title">空余时间</text>
-        <text class="nav-meta">控制教练名额</text>
-      </view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-members/admin-members">
-        <text class="nav-title">学员</text>
-        <text class="nav-meta">新增、修改、查课时</text>
-      </view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-staff/admin-staff">
-        <text class="nav-title">账号</text>
-        <text class="nav-meta">新增和修改账号</text>
-      </view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-import/admin-import">
-        <text class="nav-title">批量导入</text>
-        <text class="nav-meta">粘贴名单一键录入</text>
-      </view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-bookings/admin-bookings"><text class="nav-title">预约审批</text><text class="nav-meta">通过后生成排课</text></view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-course-applications/admin-course-applications"><text class="nav-title">课程申请</text><text class="nav-meta">处理学员续课</text></view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-schedule/admin-schedule"><text class="nav-title">排课</text><text class="nav-meta">特殊情况手动安排</text></view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-availability/admin-availability"><text class="nav-title">空余时间</text><text class="nav-meta">控制教练名额</text></view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-members/admin-members"><text class="nav-title">学员</text><text class="nav-meta">新增、修改、查课时</text></view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-staff/admin-staff"><text class="nav-title">账号</text><text class="nav-meta">新增和修改账号</text></view>
+      <view class="nav-card" bindtap="go" data-url="/pages/admin-import/admin-import"><text class="nav-title">批量导入</text><text class="nav-meta">粘贴名单一键录入</text></view>
     </view>
   </view>
 
-  <view class="card tappable" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
-    <view class="row card-head">
-      <view class="card-title">最新预约</view>
-      <text class="link-text">去审批</text>
-    </view>
-    <block wx:if="{{pendingBookings.length}}">
-      <view class="list-item" wx:for="{{pendingBookings}}" wx:key="id">
-        <view class="row">
-          <view>
-            <view class="name">{{item.memberName}}</view>
-            <view class="meta">{{item.slotDate}} {{item.slotTime}} · {{item.coach}}</view>
-          </view>
-          <text class="badge warn">待审批</text>
-        </view>
+  <view class="card tappable" bindtap="go" data-url="/pages/admin-members/admin-members?filter=low">
+    <view class="row card-head"><view class="card-title">低课时/欠课提醒</view><text class="link-text">去跟进</text></view>
+    <block wx:if="{{lowBalanceMembers.length}}">
+      <view class="list-item" wx:for="{{lowBalanceMembers}}" wx:key="id">
+        <view class="row"><view><view class="name">{{item.chineseName}}</view><view class="meta">{{item.productName}} · 剩余 {{item.remainingLessons}} · {{item.coach}}</view></view><text class="badge {{item.status === '欠课' || item.status === '已完成' ? 'danger' : 'warn'}}">{{item.status}}</text></view>
       </view>
+    </block>
+    <view wx:else class="empty">暂无低课时风险学员</view>
+  </view>
+
+  <view class="card tappable" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
+    <view class="row card-head"><view class="card-title">最新预约</view><text class="link-text">去审批</text></view>
+    <block wx:if="{{pendingBookings.length}}">
+      <view class="list-item" wx:for="{{pendingBookings}}" wx:key="id"><view class="row"><view><view class="name">{{item.memberName}}</view><view class="meta">{{item.slotDate}} {{item.slotTime}} · {{item.coach}}</view></view><text class="badge warn">待审批</text></view></view>
     </block>
     <view wx:else class="empty">暂无待审批预约</view>
   </view>

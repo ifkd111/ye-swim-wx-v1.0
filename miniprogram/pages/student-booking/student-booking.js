@@ -1,23 +1,6 @@
 const api = require("../../utils/api");
 const rules = require("../../utils/rules");
 
-function toDate(value) {
-  return new Date(String(value) + "T00:00:00");
-}
-
-function daysBetween(a, b) {
-  return Math.floor((toDate(a) - toDate(b)) / 86400000);
-}
-
-function dayLabel(slotDate) {
-  const today = rules.formatDateChina(new Date());
-  const diff = daysBetween(slotDate, today);
-  if (diff === 1) return "明天";
-  if (diff === 2) return "后天";
-  const week = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][toDate(slotDate).getDay()];
-  return slotDate + " " + week;
-}
-
 Page({
   data: {
     ruleText: rules.bookingRuleText(),
@@ -42,7 +25,10 @@ Page({
 
   load() {
     api.call("getHomeData").then((data) => {
-      const bookings = data.bookingRequests || [];
+      const bookings = (data.bookingRequests || []).map((item) => Object.assign({}, item, {
+        statusClass: item.status === "pending" ? "warn" : item.status === "rejected" || item.status === "cancelled_by_student" || item.status === "cancelled_by_admin" ? "danger" : "",
+        statusTip: item.status === "pending" ? "老板确认后才算预约成功" : item.status === "approved" ? "已生成正式课程" : item.status === "rejected" ? "可重新选择其他时间" : "该预约已取消"
+      }));
       const activeBySlot = {};
       bookings.forEach((booking) => {
         if (booking.status === "pending" || booking.status === "approved") activeBySlot[booking.slotId] = true;
@@ -52,7 +38,7 @@ Page({
         .map((slot) => {
           const left = Math.max(0, Number(slot.left === undefined ? slot.capacity || 1 : slot.left));
           return Object.assign({}, slot, {
-            dayLabel: dayLabel(slot.slotDate),
+            dayLabel: rules.dayLabel(slot.slotDate),
             left
           });
         })
@@ -72,10 +58,9 @@ Page({
   },
 
   applyFilter() {
-    const today = rules.formatDateChina(new Date());
     const visibleSlots = this.data.slots.filter((slot) => {
-      const diff = daysBetween(slot.slotDate, today);
-      const weekday = toDate(slot.slotDate).getDay();
+      const diff = rules.daysFromToday(slot.slotDate);
+      const weekday = rules.toDate(slot.slotDate).getDay();
       if (this.data.filter === "tomorrow") return diff >= 1;
       if (this.data.filter === "week") return diff >= 0 && diff <= 7;
       if (this.data.filter === "weekend") return weekday === 0 || weekday === 6;

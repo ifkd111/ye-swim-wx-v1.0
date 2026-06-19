@@ -1,68 +1,44 @@
 <view class="page">
   <view class="topbar">
-    <view>
-      <view class="title">教练工作台</view>
-      <view class="subtitle">{{viewer.fullName || viewer.coachName}} · 本周课程与出勤</view>
-    </view>
-    <view class="top-actions">
-      <button class="mini" bindtap="changePassword">改密码</button>
-      <button bindtap="logout">退出</button>
-    </view>
+    <view><view class="title">教练工作台</view><view class="subtitle">{{viewer.fullName || viewer.coachName}} · 今天上课、确认出勤、提交空余</view></view>
+    <view class="top-actions"><button class="mini" bindtap="changePassword">改密码</button><button bindtap="logout">退出</button></view>
   </view>
 
   <view class="grid">
-    <view class="metric tappable" bindtap="goSchedule" data-filter="pending">
-      <text class="metric-value">{{stats.pending}}</text>
-      <text class="metric-label">待确认</text>
-    </view>
-    <view class="metric tappable" bindtap="goMembers">
-      <text class="metric-value">{{stats.members}}</text>
-      <text class="metric-label">我的学员</text>
-    </view>
+    <view class="metric tappable" bindtap="goSchedule" data-filter="pending"><text class="metric-value">{{stats.pending}}</text><text class="metric-label">今日待确认</text></view>
+    <view class="metric tappable" bindtap="goSchedule" data-filter="week"><text class="metric-value">{{stats.upcoming}}</text><text class="metric-label">待上课</text></view>
+    <view class="metric tappable" bindtap="goMembers"><text class="metric-value">{{stats.members}}</text><text class="metric-label">我的学员</text></view>
+    <view class="metric tappable" bindtap="goAvailability"><text class="metric-value">+</text><text class="metric-label">提交空余</text></view>
+  </view>
+
+  <view class="card hero-card">
+    <view class="row"><view><view class="card-title">今天课程</view><view class="meta">现场使用优先：到课后立即确认出勤</view></view><button class="mini" bindtap="goSchedule" data-filter="today">全部</button></view>
+    <block wx:if="{{todaySchedules.length}}">
+      <view class="list-item" wx:for="{{todaySchedules}}" wx:key="id">
+        <view class="row"><view><view class="name">{{item.lessonTime}} · {{item.memberName}}</view><view class="meta">{{item.campus}} · 剩余 {{item.remainingLessons}} · {{item.memberStatus}}</view></view><text class="badge {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待确认'}}</text></view>
+        <view class="toolbar" wx:if="{{item.lessonStatus !== 'completed'}}"><button class="primary" data-id="{{item.id}}" bindtap="mark">确认出勤</button></view>
+      </view>
+    </block>
+    <view wx:else class="empty">今天暂无课程</view>
   </view>
 
   <view class="card">
-    <view class="row">
-      <view>
-        <view class="card-title">本周课程</view>
-        <view class="meta">管理员已安排，教练可确认出勤</view>
-      </view>
-      <button class="mini" bindtap="goSchedule" data-filter="week">查看全部</button>
-    </view>
+    <view class="row"><view><view class="card-title">本周课程</view><view class="meta">未来 7 天排课</view></view><button class="mini" bindtap="goSchedule" data-filter="week">查看全部</button></view>
     <block wx:if="{{weekSchedules.length}}">
       <view class="list-item" wx:for="{{weekSchedules}}" wx:key="id">
-        <view class="row">
-          <view>
-            <view class="name">{{item.dayLabel}} · {{item.memberName}}</view>
-            <view class="meta">{{item.lessonDate}} {{item.lessonTime}} · {{item.campus}}</view>
-          </view>
-          <text class="badge {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待确认'}}</text>
-        </view>
-        <view class="toolbar" wx:if="{{item.lessonStatus !== 'completed'}}">
-          <button class="primary" data-id="{{item.id}}" bindtap="mark">确认出勤</button>
-        </view>
+        <view class="row"><view><view class="name">{{item.dayLabel}} · {{item.memberName}}</view><view class="meta">{{item.lessonDate}} {{item.lessonTime}} · {{item.campus}} · 剩余 {{item.remainingLessons}}</view></view><text class="badge {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待上课'}}</text></view>
+        <view class="toolbar" wx:if="{{item.lessonStatus !== 'completed'}}"><button class="primary" data-id="{{item.id}}" bindtap="mark">确认出勤</button></view>
       </view>
     </block>
     <view wx:else class="empty">本周暂无课程</view>
-    <button class="primary wide-action" bindtap="goAvailability">提交空余时间</button>
   </view>
 
   <view class="card">
-    <view class="row">
-      <view class="card-title">已安排课程</view>
-      <button class="mini" bindtap="goSchedule" data-filter="all">全部</button>
-    </view>
-    <block wx:if="{{arrangedSchedules.length}}">
-      <view class="list-item tappable" wx:for="{{arrangedSchedules}}" wx:key="id" bindtap="goSchedule" data-filter="all">
-        <view class="row">
-          <view>
-            <view class="name">{{item.dayLabel}} · {{item.memberName}}</view>
-            <view class="meta">{{item.lessonDate}} {{item.lessonTime}} · {{item.campus}}</view>
-          </view>
-          <text class="badge {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待上课'}}</text>
-        </view>
-      </view>
+    <view class="row"><view class="card-title">我的空余提交</view><button class="mini" bindtap="goAvailability">管理</button></view>
+    <block wx:if="{{recentAvailability.length}}">
+      <view class="list-item" wx:for="{{recentAvailability}}" wx:key="id"><view class="row"><view><view class="name">{{item.dayLabel || item.slotDate}} {{item.slotTime}}</view><view class="meta">{{item.campus}} · 名额 {{item.bookedCount || 0}}/{{item.capacity}}</view></view><text class="badge {{item.status === 'draft' ? 'warn' : item.left === 0 ? 'danger' : ''}}">{{item.statusLabel || (item.status === 'draft' ? '待发布' : '已发布')}}</text></view></view>
     </block>
-    <view wx:else class="empty">暂无待上课排课</view>
+    <view wx:else class="empty">还没有提交空余时间</view>
+    <button class="primary wide-action" bindtap="goAvailability">提交空余时间</button>
   </view>
 </view>

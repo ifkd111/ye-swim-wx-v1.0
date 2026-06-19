@@ -1,26 +1,13 @@
 const api = require("../../utils/api");
 const rules = require("../../utils/rules");
 
-function toDate(value) {
-  return new Date(String(value) + "T00:00:00");
-}
-
-function daysFromToday(value) {
-  const today = toDate(rules.formatDateChina(new Date()));
-  return Math.floor((toDate(value) - today) / 86400000);
-}
-
-function dayLabel(value) {
-  const diff = daysFromToday(value);
-  if (diff === 0) return "今天";
-  if (diff === 1) return "明天";
-  if (diff === 2) return "后天";
-  return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][toDate(value).getDay()];
-}
-
-function decorateSchedule(item) {
+function decorateSchedule(item, members) {
+  const member = (members || []).find((m) => m.id === item.memberId || m.chineseName === item.memberName) || {};
   return Object.assign({}, item, {
-    dayLabel: dayLabel(item.lessonDate),
+    dayLabel: rules.dayLabel(item.lessonDate),
+    diff: rules.daysFromToday(item.lessonDate),
+    remainingLessons: member.remainingLessons,
+    memberStatus: member.status,
     canMark: item.lessonStatus !== "completed"
   });
 }
@@ -29,8 +16,10 @@ Page({
   data: {
     viewer: {},
     stats: {},
+    todaySchedules: [],
     weekSchedules: [],
     arrangedSchedules: [],
+    recentAvailability: [],
     schedules: []
   },
 
@@ -42,20 +31,25 @@ Page({
   load() {
     api.call("getHomeData").then((data) => {
       const schedules = (data.schedules || [])
-        .map(decorateSchedule)
-        .sort((a, b) => (a.lessonDate + a.lessonTime).localeCompare(b.lessonDate + b.lessonTime));
-      const weekSchedules = schedules.filter((item) => {
-        const diff = daysFromToday(item.lessonDate);
-        return diff >= 0 && diff <= 6;
-      });
-      const arrangedSchedules = schedules.filter((item) => daysFromToday(item.lessonDate) >= 0 && item.lessonStatus !== "completed");
+        .map((item) => decorateSchedule(item, data.members || []))
+        .sort((a, b) => rules.sortByDateTime(a, b));
+      const todaySchedules = schedules.filter((item) => item.diff === 0 && item.lessonStatus !== "cancelled");
+      const weekSchedules = schedules.filter((item) => item.diff >= 0 && item.diff <= 6);
+      const arrangedSchedules = schedules.filter((item) => item.diff >= 0 && item.lessonStatus !== "completed" && item.lessonStatus !== "cancelled");
+      const dueCheckins = schedules.filter((item) => item.diff <= 0 && item.lessonStatus === "pending");
+      const availability = (data.availabilitySlots || [])
+        .slice()
+        .sort((a, b) => (String(b.slotDate || "") + String(b.slotTime || "")).localeCompare(String(a.slotDate || "") + String(a.slotTime || "")));
       this.setData({
         viewer: data.viewer,
         schedules: schedules.slice(0, 50),
+        todaySchedules: todaySchedules.slice(0, 8),
         weekSchedules: weekSchedules.slice(0, 8),
         arrangedSchedules: arrangedSchedules.slice(0, 8),
+        recentAvailability: availability.slice(0, 4),
         stats: {
-          pending: schedules.filter((item) => item.lessonStatus !== "completed").length,
+          pending: dueCheckins.length,
+          upcoming: arrangedSchedules.length,
           members: (data.members || []).length,
           week: weekSchedules.length
         }
@@ -65,45 +59,29 @@ Page({
 
   mark(event) {
     const scheduleId = event.currentTarget.dataset.id;
-    const schedule = (this.data.schedules || this.data.visibleSchedules || []).find((item) => item.id === scheduleId) ||
-      (this.data.weekSchedules || []).find((item) => item.id === scheduleId) || {};
+    const schedule = (this.data.schedules || []).find((item) => item.id === scheduleId) || {};
+    const remainText = schedule.remainingLessons === undefined ? "" : "\n当前剩余课时：" + schedule.remainingLessons + "（" + (schedule.memberStatus || "") + "）";
     wx.showModal({
       title: "确认出勤",
-      content: [schedule.memberName || "该学员", (schedule.lessonDate || "") + " " + (schedule.lessonTime || ""), "确认后将按课程类型扣课。"].join("\n"),
+      content: [schedule.memberName || "该学员", (schedule.lessonDate || "") + " " + (schedule.lessonTime || ""), "确认后将按课程类型扣课。" + remainText].join("\n"),
       confirmText: "确认出勤",
       success: (res) => {
         if (!res.confirm) return;
         api.syncing("正在确认");
-        api
-          .call("markAttendance", { scheduleId })
-          .then((result) => {
-            api.done(result.message);
-            this.load();
-          })
-          .catch(api.fail);
+        api.call("markAttendance", { scheduleId }).then((result) => {
+          api.done(result.message);
+          this.load();
+        }).catch(api.fail);
       }
     });
   },
 
-  goAvailability() {
-    wx.navigateTo({ url: "/pages/coach-availability/coach-availability" });
-  },
-
+  goAvailability() { wx.navigateTo({ url: "/pages/coach-availability/coach-availability" }); },
   goSchedule(event) {
     const filter = event && event.currentTarget.dataset.filter ? event.currentTarget.dataset.filter : "week";
     wx.navigateTo({ url: "/pages/coach-schedule/coach-schedule?filter=" + filter });
   },
-
-  goMembers() {
-    wx.navigateTo({ url: "/pages/coach-members/coach-members" });
-  },
-
-  changePassword() {
-    wx.navigateTo({ url: "/pages/change-password/change-password" });
-  },
-
-  logout() {
-    api.clearSession();
-    wx.reLaunch({ url: "/pages/login/login" });
-  }
+  goMembers() { wx.navigateTo({ url: "/pages/coach-members/coach-members" }); },
+  changePassword() { wx.navigateTo({ url: "/pages/change-password/change-password" }); },
+  logout() { api.clearSession(); wx.reLaunch({ url: "/pages/login/login" }); }
 });

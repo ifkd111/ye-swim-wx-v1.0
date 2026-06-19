@@ -1,27 +1,10 @@
 const api = require("../../utils/api");
 const rules = require("../../utils/rules");
 
-function toDate(value) {
-  return new Date(String(value) + "T00:00:00");
-}
-
-function daysFromToday(value) {
-  const today = toDate(rules.formatDateChina(new Date()));
-  return Math.floor((toDate(value) - today) / 86400000);
-}
-
-function dayLabel(value) {
-  const diff = daysFromToday(value);
-  if (diff === 0) return "今天";
-  if (diff === 1) return "明天";
-  if (diff === 2) return "后天";
-  return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][toDate(value).getDay()];
-}
-
 function decorateSchedule(item) {
   return Object.assign({}, item, {
-    dayLabel: dayLabel(item.lessonDate),
-    diff: daysFromToday(item.lessonDate)
+    dayLabel: rules.dayLabel(item.lessonDate),
+    diff: rules.daysFromToday(item.lessonDate)
   });
 }
 
@@ -29,9 +12,13 @@ Page({
   data: {
     viewer: {},
     member: {},
+    nextSchedule: null,
     weekSchedules: [],
     bookingRequests: [],
+    pendingApplications: [],
     courseProducts: [],
+    courseProductIndex: 0,
+    selectedProduct: {},
     courseNote: ""
   },
 
@@ -42,51 +29,49 @@ Page({
 
   load() {
     api.call("getHomeData").then((data) => {
-      const schedules = (data.schedules || [])
-        .map(decorateSchedule)
-        .sort((a, b) => (a.lessonDate + a.lessonTime).localeCompare(b.lessonDate + b.lessonTime));
+      const schedules = (data.schedules || []).map(decorateSchedule).sort((a, b) => rules.sortByDateTime(a, b));
       const weekSchedules = schedules.filter((item) => item.diff >= 0 && item.diff <= 6);
+      const nextSchedule = schedules.find((item) => item.diff >= 0 && item.lessonStatus !== "cancelled") || null;
+      const products = data.courseProducts || [];
+      const index = Math.min(this.data.courseProductIndex || 0, Math.max(products.length - 1, 0));
       this.setData({
         viewer: data.viewer,
         member: (data.members || [])[0] || {},
+        nextSchedule,
         weekSchedules: weekSchedules.slice(0, 8),
         bookingRequests: data.bookingRequests || [],
-        courseProducts: data.courseProducts || []
+        pendingApplications: (data.courseApplications || []).filter((item) => item.status === "pending"),
+        courseProducts: products,
+        courseProductIndex: index,
+        selectedProduct: products[index] || {}
       });
     });
   },
 
-  noteInput(event) {
-    this.setData({ courseNote: event.detail.value });
+  noteInput(event) { this.setData({ courseNote: event.detail.value }); },
+
+  productChange(event) {
+    const index = Number(event.detail.value || 0);
+    this.setData({ courseProductIndex: index, selectedProduct: this.data.courseProducts[index] || {} });
   },
 
-  goBooking() {
-    wx.navigateTo({ url: "/pages/student-booking/student-booking" });
-  },
-
-  goRecords() {
-    wx.navigateTo({ url: "/pages/student-records/student-records?focus=attendance" });
-  },
-
-  changePassword() {
-    wx.navigateTo({ url: "/pages/change-password/change-password" });
-  },
+  goBooking() { wx.navigateTo({ url: "/pages/student-booking/student-booking" }); },
+  goRecords() { wx.navigateTo({ url: "/pages/student-records/student-records?focus=attendance" }); },
+  changePassword() { wx.navigateTo({ url: "/pages/change-password/change-password" }); },
 
   applyCourse() {
-    const product = this.data.courseProducts[0] || {};
+    const product = this.data.selectedProduct || this.data.courseProducts[0] || {};
+    if (!product.id) {
+      api.toast("暂无可申请课程");
+      return;
+    }
     api.syncing("正在提交");
-    api
-      .call("createCourseApplication", { productId: product.id || "", note: this.data.courseNote })
-      .then((result) => {
-        api.done(result.message);
-        this.setData({ courseNote: "" });
-        this.load();
-      })
-      .catch(api.fail);
+    api.call("createCourseApplication", { productId: product.id || "", note: this.data.courseNote }).then((result) => {
+      api.done(result.message);
+      this.setData({ courseNote: "" });
+      this.load();
+    }).catch(api.fail);
   },
 
-  logout() {
-    api.clearSession();
-    wx.reLaunch({ url: "/pages/login/login" });
-  }
+  logout() { api.clearSession(); wx.reLaunch({ url: "/pages/login/login" }); }
 });

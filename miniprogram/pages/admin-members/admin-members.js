@@ -17,7 +17,13 @@ Page({
     members: [],
     allMembers: [],
     keyword: "",
+    filter: "all",
+    filterStats: {},
     form: Object.assign({}, emptyForm)
+  },
+
+  onLoad(query) {
+    if (query && query.filter) this.setData({ filter: query.filter });
   },
 
   onShow() {
@@ -40,14 +46,30 @@ Page({
     this.setData({ keyword: event.detail.value }, () => this.applyFilter());
   },
 
+  setFilter(event) {
+    this.setData({ filter: event.currentTarget.dataset.filter || "all" }, () => this.applyFilter());
+  },
+
   applyFilter() {
     const keyword = String(this.data.keyword || "").trim().toLowerCase();
-    const members = (this.data.allMembers || []).filter((item) => {
+    const allMembers = this.data.allMembers || [];
+    const filterStats = {
+      all: allMembers.length,
+      low: allMembers.filter((item) => item.status === "即将用完" || item.status === "欠课" || item.status === "已完成").length,
+      debt: allMembers.filter((item) => item.status === "欠课").length,
+      done: allMembers.filter((item) => item.status === "已完成").length,
+      monthly: allMembers.filter((item) => item.productType === "monthly").length
+    };
+    const members = allMembers.filter((item) => {
+      if (this.data.filter === "low" && ["即将用完", "欠课", "已完成"].indexOf(item.status) < 0) return false;
+      if (this.data.filter === "debt" && item.status !== "欠课") return false;
+      if (this.data.filter === "done" && item.status !== "已完成") return false;
+      if (this.data.filter === "monthly" && item.productType !== "monthly") return false;
       if (!keyword) return true;
       return [item.chineseName, item.phone, item.campus, item.coach, item.productName, item.notes, item.memberNo]
         .some((value) => String(value || "").toLowerCase().indexOf(keyword) >= 0);
     });
-    this.setData({ members });
+    this.setData({ members, filterStats });
   },
 
   editMember(event) {

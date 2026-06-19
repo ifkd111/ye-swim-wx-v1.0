@@ -24,25 +24,40 @@ Page({
   },
 
   approve(event) {
-    this.submit("approveBookingRequest", event.currentTarget.dataset.id);
+    wx.showModal({
+      title: "通过预约",
+      content: "通过后将自动生成正式排课，确认处理？",
+      confirmText: "通过",
+      success: (res) => { if (res.confirm) this.submit("approveBookingRequest", event.currentTarget.dataset.id); }
+    });
   },
 
   reject(event) {
-    this.submit("rejectBookingRequest", event.currentTarget.dataset.id);
+    this.askReason("拒绝预约", "例如：名额已满 / 时间需调整", "rejectBookingRequest", event.currentTarget.dataset.id);
   },
 
   cancel(event) {
-    this.submit("cancelBookingRequest", event.currentTarget.dataset.id);
+    this.askReason("取消预约", "例如：教练临时有事", "cancelBookingRequest", event.currentTarget.dataset.id);
   },
 
-  submit(action, requestId) {
+  askReason(title, placeholderText, action, requestId) {
+    wx.showModal({
+      title,
+      editable: true,
+      placeholderText,
+      confirmText: "确认",
+      success: (res) => {
+        if (!res.confirm) return;
+        this.submit(action, requestId, res.content || "");
+      }
+    });
+  },
+
+  submit(action, requestId, reason) {
     api.syncing("正在同步");
-    api
-      .call(action, { requestId })
-      .then((result) => {
-        api.done(result.message);
-        this.load();
-      })
-      .catch(api.fail);
+    api.call(action, { requestId, reason }).then((result) => {
+      api.done(result.message);
+      this.load();
+    }).catch(api.fail);
   }
 });

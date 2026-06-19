@@ -82,9 +82,18 @@ function main() {
   const refreshedStudentHome = call(student, "getHomeData");
   const slot = refreshedStudentHome.availabilitySlots.find((item) => item.id === availability.id);
   assert(slot, "学员应看到已发布可约时间");
+  assert.strictEqual(slot.capacity, 2, "可约时间应保留容量");
+  assert.strictEqual(slot.bookedCount, 0, "未预约前已约人数应为 0");
+  assert.strictEqual(slot.left, 2, "未预约前剩余名额应等于容量");
+  assert(slot.dayLabel, "可约时间应有面向用户的日期标签");
 
   const booking = call(student, "createBookingRequest", { slotId: slot.id }).request;
   assert.strictEqual(booking.status, "pending", "学员预约应进入待审批");
+  const afterBookingHome = call(student, "getHomeData");
+  const bookedSlot = afterBookingHome.availabilitySlots.find((item) => item.id === availability.id);
+  assert.strictEqual(bookedSlot.bookedCount, 1, "提交预约后已约人数应增加");
+  assert.strictEqual(bookedSlot.left, 1, "提交预约后剩余名额应减少");
+  assert(afterBookingHome.dashboard.pendingBookings.length >= 1, "学员首页应有预约待办数据");
 
   const approved = call(admin, "approveBookingRequest", { requestId: booking.id }).schedule;
   assert(approved.id, "管理员审批应生成排课");

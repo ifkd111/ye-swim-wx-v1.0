@@ -373,3 +373,45 @@ textarea {
     width: 100%;
   }
 }
+
+
+.hero-card {
+  border-color: #b9d8ff;
+  background: linear-gradient(180deg, #ffffff 0%, #f4f9ff 100%);
+}
+
+.text-danger {
+  color: #c81e1e !important;
+}
+
+.text-warn {
+  color: #a06500 !important;
+}
+
+.picker-box {
+  width: 100%;
+  min-height: 78rpx;
+  border-radius: 14rpx;
+  padding: 18rpx 22rpx;
+  color: #10233f;
+  background: #f8fbff;
+  border: 1rpx solid #c9dbf2;
+}
+
+.recommend {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16rpx;
+  padding: 18rpx 0;
+  border-top: 1rpx solid #e1ebf8;
+}
+
+.recommend:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.status-filter {
+  margin: 16rpx 0;
+}

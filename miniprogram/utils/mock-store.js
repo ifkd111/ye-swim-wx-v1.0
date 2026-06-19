@@ -261,8 +261,30 @@ function bookingsFor(state, viewer) {
     .sort((a, b) => String(b.createdAt || "").localeCompare(String(a.createdAt || "")));
 }
 
+function enrichAvailabilitySlots(state, slots) {
+  const active = state.bookingRequests.filter((item) => item.status === "pending" || item.status === "approved");
+  return slots.map((slot) => {
+    const pendingCount = active.filter((item) => item.slotId === slot.id && item.status === "pending").length;
+    const approvedCount = active.filter((item) => item.slotId === slot.id && item.status === "approved").length;
+    const bookedCount = pendingCount + approvedCount;
+    const capacity = Math.max(1, Number(slot.capacity || 1));
+    const left = Math.max(0, capacity - bookedCount);
+    const expired = rules.daysFromToday(slot.slotDate) < 0;
+    return Object.assign({}, slot, {
+      capacity,
+      pendingCount,
+      approvedCount,
+      bookedCount,
+      left,
+      fillRate: Math.round(bookedCount * 100 / capacity),
+      dayLabel: rules.dayLabel(slot.slotDate),
+      statusLabel: expired ? "已过期" : slot.status === "published" ? left > 0 ? "可预约" : "已满" : "待发布"
+    });
+  });
+}
+
 function availabilityFor(state, viewer) {
-  return state.availabilitySlots
+  const slots = state.availabilitySlots
     .filter((slot) => {
       if (viewer.role === "admin") return true;
       if (viewer.role === "coach") return slot.coach === viewer.coachName;
@@ -277,6 +299,32 @@ function availabilityFor(state, viewer) {
       return false;
     })
     .sort((a, b) => (a.slotDate + String(a.publishOrder).padStart(4, "0") + a.slotTime).localeCompare(b.slotDate + String(b.publishOrder).padStart(4, "0") + b.slotTime));
+  return enrichAvailabilitySlots(state, slots);
+}
+
+function nextScheduleFor(state, viewer) {
+  return schedulesFor(state, viewer)
+    .filter((item) => rules.daysFromToday(item.lessonDate) >= 0 && item.lessonStatus !== "cancelled")
+    .sort((a, b) => rules.sortByDateTime(a, b))[0] || null;
+}
+
+function dashboardInsights(state, viewer) {
+  const members = memberViews(state, viewer);
+  const schedules = schedulesFor(state, viewer);
+  const bookings = bookingsFor(state, viewer);
+  const applications = state.courseApplications.filter((item) => viewer.role === "admin" || item.memberId === viewer.memberId);
+  const today = rules.formatDateChina(new Date());
+  const lowBalanceMembers = members.filter((item) => item.status === "即将用完" || item.status === "欠课" || item.status === "已完成");
+  const todaySchedules = schedules.filter((item) => item.lessonDate === today && item.lessonStatus !== "cancelled");
+  const overdueCheckins = schedules.filter((item) => rules.daysFromToday(item.lessonDate) <= 0 && item.lessonStatus === "pending");
+  return {
+    lowBalanceMembers,
+    todaySchedules,
+    overdueCheckins,
+    pendingBookings: bookings.filter((item) => item.status === "pending"),
+    pendingApplications: applications.filter((item) => item.status === "pending"),
+    nextSchedule: nextScheduleFor(state, viewer)
+  };
 }
 
 function homeData(state, viewer) {
@@ -298,6 +346,7 @@ function homeData(state, viewer) {
       return false;
     }),
     courseProducts: state.courseProducts,
+    dashboard: dashboardInsights(state, viewer),
     accounts: viewer.role === "admin" ? state.accounts.map(safeAccount) : []
   };
 }

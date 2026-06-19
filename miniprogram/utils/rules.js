@@ -22,6 +22,31 @@ function formatDateChina(date) {
   return year + "-" + month + "-" + day;
 }
 
+function toDate(value) {
+  return new Date(String(value || "") + "T00:00:00");
+}
+
+function daysFromToday(value, now) {
+  const today = toDate(formatDateChina(shanghaiNow(now)));
+  return Math.floor((toDate(value) - today) / 86400000);
+}
+
+function dayLabel(value, now) {
+  const diff = daysFromToday(value, now);
+  if (diff === 0) return "今天";
+  if (diff === 1) return "明天";
+  if (diff === 2) return "后天";
+  if (diff === -1) return "昨天";
+  const week = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
+  return String(value || "") + " " + week[toDate(value).getDay()];
+}
+
+function sortByDateTime(a, b, dateField, timeField) {
+  const dateKey = dateField || "lessonDate";
+  const timeKey = timeField || "lessonTime";
+  return (String(a[dateKey] || "") + String(a[timeKey] || "")).localeCompare(String(b[dateKey] || "") + String(b[timeKey] || ""));
+}
+
 function minStudentBookingDate(now) {
   const current = shanghaiNow(now);
   const min = new Date(current);
@@ -62,6 +87,10 @@ module.exports = {
   roleFromAccount,
   shanghaiNow,
   formatDateChina,
+  toDate,
+  daysFromToday,
+  dayLabel,
+  sortByDateTime,
   minStudentBookingDate,
   isBookableForStudent,
   bookingRuleText,

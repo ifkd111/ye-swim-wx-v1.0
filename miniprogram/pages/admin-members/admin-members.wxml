@@ -52,6 +52,13 @@
       <text class="field-label">搜索筛选</text>
       <input value="{{keyword}}" placeholder="按姓名、手机号、教练、校区、备注搜索" bindinput="search" />
     </view>
+    <view class="chip-list status-filter">
+      <view class="chip {{filter === 'all' ? 'active' : ''}}" bindtap="setFilter" data-filter="all">全部 {{filterStats.all}}</view>
+      <view class="chip {{filter === 'low' ? 'active' : ''}}" bindtap="setFilter" data-filter="low">低课时 {{filterStats.low}}</view>
+      <view class="chip {{filter === 'debt' ? 'active' : ''}}" bindtap="setFilter" data-filter="debt">欠课 {{filterStats.debt}}</view>
+      <view class="chip {{filter === 'done' ? 'active' : ''}}" bindtap="setFilter" data-filter="done">已完成 {{filterStats.done}}</view>
+      <view class="chip {{filter === 'monthly' ? 'active' : ''}}" bindtap="setFilter" data-filter="monthly">月卡 {{filterStats.monthly}}</view>
+    </view>
     <view class="meta">当前显示 {{members.length}} / {{allMembers.length}} 位</view>
     <block wx:if="{{members.length}}">
       <view class="list-item tappable" wx:for="{{members}}" wx:key="id" bindtap="editMember" data-id="{{item.id}}">
