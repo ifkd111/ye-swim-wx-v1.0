@@ -15,10 +15,11 @@
 在 PowerShell 里进入项目：
 
 ```powershell
-cd D:\ye-swim\ye-swim-wx-v1.0
+cd D:\课表\ye-swim-wx-v1.0
 npm install
 npm run validate
 npm run test:rules
+npm run test:flow
 npm run seed:export
 ```
 
@@ -26,7 +27,7 @@ npm run seed:export
 
 1. 打开微信开发者工具。
 2. 选择“导入项目”。
-3. 项目目录选择：`D:\ye-swim\ye-swim-wx-v1.0`。
+3. 项目目录选择：`D:\课表\ye-swim-wx-v1.0`。
 4. AppID 当前已配置为 `wx7f2d509804954eaf`。
 5. 当前 `miniprogram/env.js` 使用真实云环境；云函数已支持首次 `yeats / 1324` 登录时自动初始化示例数据。
 
@@ -38,7 +39,7 @@ npm run seed:export
 
 ```js
 module.exports = {
-  version: "1.0.10",
+  version: "1.2.0",
   envId: "cloudbase-d6ge373q7724bcfe4",
   useMock: false
 };
@@ -53,7 +54,7 @@ module.exports = {
 
 ```powershell
 npm run ci:preview
-npm run ci:upload -- --key=D:\ye-swim\ye-swim-private-backup\private.wx7f2d509804954eaf.key --uv=1.0.10 --ud=v1.10正式版稳定安全升级
+npm run ci:upload -- --key=你的代码上传密钥路径 --uv=1.2.0 --ud=v1.2.0二维码核销与学员端体验升级
 ```
 
-当前 `1.0.10` 用真实云环境联调。正式上线还需要在微信公众平台设置体验版、提交审核并发布。
+当前 `1.2.0` 用真实云环境联调。正式上线还需要在微信公众平台设置体验版、提交审核并发布。

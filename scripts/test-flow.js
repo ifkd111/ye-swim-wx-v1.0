@@ -97,14 +97,23 @@ function main() {
 
   const approved = call(admin, "approveBookingRequest", { requestId: booking.id }).schedule;
   assert(approved.id, "管理员审批应生成排课");
+  assert(approved.verificationCode, "审批生成排课后应生成核销码");
+  assert.strictEqual(rules.normalizeVerificationCode(approved.verificationPayload), approved.verificationCode, "核销 payload 应能解析回核销码");
 
   const coachHome = call(coach, "getHomeData");
   assert(coachHome.members.length >= 1, "教练应看到自己学员");
   const pendingSchedule = coachHome.schedules.find((item) => item.id === approved.id);
   assert(pendingSchedule, "教练应看到管理员审批生成的排课");
+  assert.strictEqual(pendingSchedule.verificationStatus, "active", "待上课排课应可核销");
 
-  const attendance = call(coach, "markAttendance", { scheduleId: pendingSchedule.id });
-  assert(attendance.message.indexOf("确认出勤") >= 0, "教练确认出勤失败");
+  const verifyResult = call(coach, "verifyScheduleQr", { code: pendingSchedule.verificationPayload });
+  assert(verifyResult.message.indexOf("确认出勤") >= 0, "教练扫码核销失败");
+  assert.strictEqual(verifyResult.log.source, "qr_verify", "扫码核销应记录来源");
+  assert.throws(
+    () => call(coach, "verifyScheduleQr", { code: pendingSchedule.verificationPayload }),
+    /已经核销/,
+    "已核销课程不可重复核销"
+  );
 
   const application = call(student, "createCourseApplication", {
     productId: refreshedStudentHome.courseProducts[0].id,
@@ -140,8 +149,24 @@ function main() {
     coach: "绿洲教练",
     memberName: "白卓可"
   }).schedule;
+  assert(manual.verificationCode, "手动排课也应生成核销码");
   const cancelledSchedule = call(admin, "cancelSchedule", { scheduleId: manual.id, reason: "测试取消" }).schedule;
   assert.strictEqual(cancelledSchedule.lessonStatus, "cancelled", "老板应能取消未完成排课");
+
+  const adminVerifySchedule = call(admin, "createManualSchedule", {
+    lessonDate: futureDate(4),
+    lessonTime: "18:00-19:00",
+    campus: "古北",
+    coach: "古北教练",
+    memberName: "饼饼"
+  }).schedule;
+  assert.throws(
+    () => call(coach, "verifyScheduleQr", { code: adminVerifySchedule.verificationCode }),
+    /只能核销自己的课程/,
+    "教练不能核销其他教练课程"
+  );
+  const adminVerify = call(admin, "verifyScheduleQr", { code: adminVerifySchedule.verificationCode });
+  assert.strictEqual(adminVerify.log.source, "qr_verify", "老板应能跨教练扫码核销");
 
   const studentRecords = call(student, "getHomeData");
   assert(studentRecords.bookingRequests.length >= 1, "学员应看到预约记录");

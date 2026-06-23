@@ -1,7 +1,7 @@
 {
   "appid": "wx7f2d509804954eaf",
   "projectname": "ye-swim-wx-v1.0",
-  "description": "叶 微信小程序 v1.0",
+  "description": "叶 微信小程序",
   "miniprogramRoot": "miniprogram/",
   "cloudfunctionRoot": "cloudfunctions/",
   "compileType": "miniprogram",

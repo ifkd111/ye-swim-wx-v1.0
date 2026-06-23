@@ -7,6 +7,13 @@
   </view>
 
   <view class="card">
+    <view class="row scan-head">
+      <view>
+        <view class="card-title">扫码核销</view>
+        <view class="meta">扫描学员上课二维码后自动确认出勤</view>
+      </view>
+      <button class="primary mini" bindtap="scanVerify">扫码</button>
+    </view>
     <view class="chip-list">
       <view class="chip {{filter === 'week' ? 'active' : ''}}" bindtap="setFilter" data-filter="week">本周 {{stats.week}}</view>
       <view class="chip {{filter === 'pending' ? 'active' : ''}}" bindtap="setFilter" data-filter="pending">待确认 {{stats.pending}}</view>
@@ -22,8 +29,9 @@
           <view>
             <view class="name">{{item.dayLabel}} · {{item.memberName}}</view>
             <view class="meta">{{item.lessonDate}} {{item.lessonTime}} · {{item.campus}}</view>
+            <view class="meta">{{item.verificationStatusText}} · {{item.verificationPayload}}</view>
           </view>
-          <text class="badge {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待确认'}}</text>
+          <text class="badge {{item.statusClass}}">{{item.statusText}}</text>
         </view>
         <button wx:if="{{item.lessonStatus !== 'completed'}}" class="primary confirm-button" data-id="{{item.id}}" bindtap="mark">确认出勤</button>
       </view>

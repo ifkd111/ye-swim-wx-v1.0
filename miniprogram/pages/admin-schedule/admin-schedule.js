@@ -1,4 +1,5 @@
 const api = require("../../utils/api");
+const rules = require("../../utils/rules");
 
 const emptyForm = {
   lessonDate: "",
@@ -10,6 +11,19 @@ const emptyForm = {
 
 function unique(values) {
   return values.filter((value, index) => value && values.indexOf(value) === index);
+}
+
+function decorateSchedule(item) {
+  const verificationStatus = item.verificationStatus || rules.verificationStatus(item);
+  const statusText = item.lessonStatus === "completed" ? "完成" : item.lessonStatus === "cancelled" ? "已取消" : "待上课";
+  const statusClass = item.lessonStatus === "completed" ? "" : item.lessonStatus === "cancelled" ? "danger" : verificationStatus === "expired" ? "danger" : "warn";
+  return Object.assign({}, item, {
+    verificationStatus,
+    verificationStatusText: verificationStatus === "verified" ? "已核销" : verificationStatus === "expired" ? "已过期" : "待核销",
+    verificationStatusClass: verificationStatus === "active" ? "warn" : verificationStatus === "verified" ? "" : "danger",
+    statusText,
+    statusClass
+  });
 }
 
 Page({
@@ -31,7 +45,7 @@ Page({
     api.call("getHomeData").then((data) => {
       const members = data.members || [];
       this.setData({
-        schedules: (data.schedules || []).slice(0, 50),
+        schedules: (data.schedules || []).map(decorateSchedule).slice(0, 50),
         members,
         memberNames: members.map((item) => item.chineseName),
         campuses: unique(members.map((item) => item.campus)),
@@ -84,6 +98,28 @@ Page({
           api.done(result.message);
           this.load();
         }).catch(api.fail);
+      }
+    });
+  },
+
+  scanVerify() {
+    wx.scanCode({
+      onlyFromCamera: false,
+      scanType: ["qrCode"],
+      success: (res) => {
+        const code = res.result || res.path || "";
+        if (!code) {
+          api.toast("没有识别到核销码");
+          return;
+        }
+        api.syncing("正在核销");
+        api.call("verifyScheduleQr", { code }).then((result) => {
+          api.done(result.message || "已核销");
+          this.load();
+        }).catch(api.fail);
+      },
+      fail: () => {
+        api.toast("扫码已取消");
       }
     });
   }

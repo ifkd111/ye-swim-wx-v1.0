@@ -44,11 +44,29 @@ function testStatus() {
   });
 }
 
+function testVerification() {
+  const schedule = {
+    id: "schedule-test",
+    lessonDate: "2026-05-26",
+    lessonTime: "17:00-18:00",
+    memberId: "member-001",
+    memberName: "测试学员"
+  };
+  const code = rules.verificationCodeForSchedule(schedule);
+  assert(code.length >= 8, "核销码应稳定生成");
+  assert.strictEqual(rules.normalizeVerificationCode("YS:" + code), code);
+  assert.strictEqual(rules.verificationPayload(code), "YS:" + code);
+  assert.strictEqual(rules.verificationStatus(schedule, "2026-05-27T10:00:00+08:00"), "active");
+  assert.strictEqual(rules.verificationStatus(schedule, "2026-06-04T10:00:00+08:00"), "expired");
+  assert.strictEqual(rules.verificationStatus(Object.assign({}, schedule, { lessonStatus: "completed" })), "verified");
+}
+
 function main() {
   testRole();
   testBookingDate();
   testDeduction();
   testStatus();
+  testVerification();
   console.log("Rule tests passed");
 }
 

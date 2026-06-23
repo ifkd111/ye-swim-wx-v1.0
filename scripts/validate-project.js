@@ -8,6 +8,8 @@ const cloudApiPath = path.join(root, "cloudfunctions", "api", "index.js");
 const envPath = path.join(root, "miniprogram", "env.js");
 const loginWxmlPath = path.join(root, "miniprogram", "pages", "login", "login.wxml");
 const packageJsonPath = path.join(root, "package.json");
+const packageLockPath = path.join(root, "package-lock.json");
+const qrCodePath = path.join(root, "miniprogram", "utils", "qrcode.js");
 
 function assert(condition, message) {
   if (!condition) throw new Error(message);
@@ -27,6 +29,7 @@ function main() {
   assert(exists(cloudApiPath), "缺少 cloudfunctions/api/index.js");
   assert(exists(envPath), "缺少 miniprogram/env.js");
   assert(exists(loginWxmlPath), "缺少登录页 WXML");
+  assert(exists(qrCodePath), "缺少二维码绘制工具");
 
   const appJson = readJson(appJsonPath);
   assert(Array.isArray(appJson.pages) && appJson.pages.length >= 10, "页面数量不足");
@@ -43,6 +46,8 @@ function main() {
   assert(config.cloudfunctionRoot === "cloudfunctions/", "cloudfunctionRoot 应为 cloudfunctions/");
 
   const pkg = readJson(packageJsonPath);
+  const lock = readJson(packageLockPath);
+  assert(lock.version === pkg.version && lock.packages && lock.packages[""] && lock.packages[""].version === pkg.version, "package-lock.json 版本号应与 package.json 一致");
   const envSource = fs.readFileSync(envPath, "utf8");
   const versionMatch = envSource.match(/version:\s*["']([^"']+)["']/);
   assert(versionMatch && versionMatch[1] === pkg.version, "miniprogram/env.js 版本号应与 package.json 一致");
@@ -56,6 +61,12 @@ function main() {
   }
 
   const apiSource = fs.readFileSync(cloudApiPath, "utf8");
+  const qr = require(qrCodePath);
+  const qrMatrix = qr.createMatrix("YS:ABC12345");
+  assert(qrMatrix.length === 21 && qrMatrix[0].length === 21, "二维码矩阵尺寸异常");
+  assert(qrMatrix.reduce((sum, row) => sum + row.filter(Boolean).length, 0) > 100, "二维码矩阵内容异常");
+  assert(JSON.stringify(qr.reedSolomonGenerator(7)) === JSON.stringify([127, 122, 154, 164, 11, 68, 117]), "二维码纠错多项式异常");
+
   [
     "login",
     "getHomeData",
@@ -69,6 +80,7 @@ function main() {
     "rejectBookingRequest",
     "cancelBookingRequest",
     "markAttendance",
+    "verifyScheduleQr",
     "cancelSchedule",
     "approveCourseApplication",
     "rejectCourseApplication",

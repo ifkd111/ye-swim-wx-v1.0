@@ -17,6 +17,7 @@ Page({
     bookingRequests: [],
     pendingApplications: [],
     courseProducts: [],
+    accountCards: [],
     courseProductIndex: 0,
     selectedProduct: {},
     courseNote: ""
@@ -42,6 +43,12 @@ Page({
         bookingRequests: data.bookingRequests || [],
         pendingApplications: (data.courseApplications || []).filter((item) => item.status === "pending"),
         courseProducts: products,
+        accountCards: [
+          { label: "绑定账号", value: data.viewer.account || "-" },
+          { label: "手机号", value: (data.members || [])[0] && (data.members || [])[0].phone || "未填写" },
+          { label: "校区", value: (data.members || [])[0] && (data.members || [])[0].campus || "-" },
+          { label: "教练", value: (data.members || [])[0] && (data.members || [])[0].coach || "-" }
+        ],
         courseProductIndex: index,
         selectedProduct: products[index] || {}
       });

@@ -1,27 +1,18 @@
 const api = require("../../utils/api");
 const rules = require("../../utils/rules");
 
-function toDate(value) {
-  return new Date(String(value) + "T00:00:00");
-}
-
-function daysFromToday(value) {
-  const today = toDate(rules.formatDateChina(new Date()));
-  return Math.floor((toDate(value) - today) / 86400000);
-}
-
-function dayLabel(value) {
-  const diff = daysFromToday(value);
-  if (diff === 0) return "今天";
-  if (diff === 1) return "明天";
-  if (diff === 2) return "后天";
-  return ["周日", "周一", "周二", "周三", "周四", "周五", "周六"][toDate(value).getDay()];
-}
-
 function decorate(item) {
+  const verificationStatus = item.verificationStatus || rules.verificationStatus(item);
+  const statusText = item.lessonStatus === "completed" ? "完成" : item.lessonStatus === "cancelled" ? "已取消" : "待确认";
+  const statusClass = item.lessonStatus === "completed" ? "" : item.lessonStatus === "cancelled" ? "danger" : verificationStatus === "expired" ? "danger" : "warn";
   return Object.assign({}, item, {
-    dayLabel: dayLabel(item.lessonDate),
-    diff: daysFromToday(item.lessonDate)
+    dayLabel: rules.dayLabel(item.lessonDate),
+    diff: rules.daysFromToday(item.lessonDate),
+    verificationStatus,
+    verificationStatusText: verificationStatus === "verified" ? "已核销" : verificationStatus === "expired" ? "已过期" : "待核销",
+    verificationStatusClass: verificationStatus === "active" ? "warn" : verificationStatus === "verified" ? "" : "danger",
+    statusText,
+    statusClass
   });
 }
 
@@ -50,12 +41,12 @@ Page({
     api.call("getHomeData").then((data) => {
       const schedules = (data.schedules || [])
         .map(decorate)
-        .sort((a, b) => (a.lessonDate + a.lessonTime).localeCompare(b.lessonDate + b.lessonTime));
+        .sort((a, b) => rules.sortByDateTime(a, b));
       this.setData({
         schedules,
         stats: {
           week: schedules.filter((item) => item.diff >= 0 && item.diff <= 6).length,
-          pending: schedules.filter((item) => item.lessonStatus !== "completed").length,
+          pending: schedules.filter((item) => item.lessonStatus !== "completed" && item.lessonStatus !== "cancelled").length,
           all: schedules.length
         }
       });
@@ -96,6 +87,28 @@ Page({
             this.load();
           })
           .catch(api.fail);
+      }
+    });
+  },
+
+  scanVerify() {
+    wx.scanCode({
+      onlyFromCamera: false,
+      scanType: ["qrCode"],
+      success: (res) => {
+        const code = res.result || res.path || res.scanType || "";
+        if (!code) {
+          api.toast("没有识别到核销码");
+          return;
+        }
+        api.syncing("正在核销");
+        api.call("verifyScheduleQr", { code }).then((result) => {
+          api.done(result.message || "已核销");
+          this.load();
+        }).catch(api.fail);
+      },
+      fail: () => {
+        api.toast("扫码已取消");
       }
     });
   }

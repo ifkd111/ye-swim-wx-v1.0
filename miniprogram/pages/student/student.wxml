@@ -1,18 +1,37 @@
 <view class="page">
   <view class="topbar">
-    <view><view class="title">我的课程</view><view class="subtitle">{{member.chineseName || viewer.fullName}}</view></view>
+    <view><view class="title">个人中心</view><view class="subtitle">{{member.chineseName || viewer.fullName}}</view></view>
     <view class="top-actions"><button class="mini" bindtap="changePassword">改密码</button><button bindtap="logout">退出</button></view>
   </view>
 
+  <view class="card profile-card">
+    <view class="row">
+      <view>
+        <view class="name">{{member.chineseName || viewer.fullName}}</view>
+        <view class="meta">{{member.productName || '未绑定课程'}} · {{member.status || '待完善'}}</view>
+      </view>
+      <text class="profile-avatar">叶</text>
+    </view>
+    <view class="profile-grid">
+      <view class="profile-item" wx:for="{{accountCards}}" wx:key="label">
+        <text class="metric-label">{{item.label}}</text>
+        <text class="profile-value">{{item.value}}</text>
+      </view>
+    </view>
+  </view>
+
   <view class="card" wx:if="{{member.id}}">
-    <view class="row"><view><view class="name">{{member.productName}}</view><view class="meta">{{member.campus}} · {{member.coach}}</view></view><text class="badge {{member.status === '欠课' ? 'danger' : member.status === '即将用完' ? 'warn' : ''}}">{{member.status}}</text></view>
+    <view class="row"><view><view class="card-title">会员权益</view><view class="meta">{{member.productName}} · {{member.campus}} · {{member.coach}}</view></view><text class="badge {{member.status === '欠课' ? 'danger' : member.status === '即将用完' ? 'warn' : ''}}">{{member.status}}</text></view>
     <view class="grid balance-grid">
       <view class="metric"><text class="metric-value">{{member.totalLessons}}</text><text class="metric-label">总课时</text></view>
       <view class="metric tappable" bindtap="goRecords"><text class="metric-value">{{member.usedLessons}}</text><text class="metric-label">已消课 · 看记录</text></view>
       <view class="metric tappable action-metric" bindtap="goBooking"><text class="metric-value">{{member.remainingLessons}}</text><text class="metric-label">剩余课时 · 去预约</text></view>
       <view class="metric tappable" bindtap="goBooking"><text class="metric-value">{{bookingRequests.length}}</text><text class="metric-label">预约申请</text></view>
     </view>
-    <button class="primary booking-button" bindtap="goBooking">预约课程 · 剩余 {{member.remainingLessons}} 节</button>
+    <view class="toolbar">
+      <button class="primary action-button" bindtap="goBooking">预约课程</button>
+      <button class="action-button" bindtap="goRecords">二维码/记录</button>
+    </view>
   </view>
 
   <view class="card hero-card">
@@ -25,7 +44,7 @@
   </view>
 
   <view class="card">
-    <view class="row"><view><view class="card-title">本周课程</view><view class="meta">显示未来 7 天已安排课程</view></view><button class="mini" bindtap="goRecords">消课记录</button></view>
+    <view class="row"><view><view class="card-title">本周课程</view><view class="meta">显示未来 7 天已安排课程</view></view><button class="mini" bindtap="goRecords">二维码</button></view>
     <block wx:if="{{weekSchedules.length}}"><view class="list-item" wx:for="{{weekSchedules}}" wx:key="id"><view class="row"><view><view class="name">{{item.dayLabel}} {{item.lessonTime}}</view><view class="meta">{{item.campus}} · {{item.coach}}</view></view><text class="badge {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待上课'}}</text></view></view></block>
     <view wx:else class="empty">本周暂无课程</view>
   </view>

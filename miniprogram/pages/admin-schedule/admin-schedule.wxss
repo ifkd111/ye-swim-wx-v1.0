@@ -1,3 +1,8 @@
 .card button {
   width: 100%;
 }
+
+.card-head button {
+  width: auto;
+  flex-shrink: 0;
+}

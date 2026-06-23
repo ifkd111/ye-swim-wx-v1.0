@@ -7,6 +7,24 @@
   </view>
 
   <view class="card">
+    <view class="card-title">上课二维码</view>
+    <block wx:if="{{schedules.length}}">
+      <view class="list-item" wx:for="{{schedules}}" wx:key="id">
+        <view class="row">
+          <view>
+            <view class="name">{{item.dayLabel}} {{item.lessonTime}}</view>
+            <view class="meta">{{item.campus}} · {{item.coach}}</view>
+            <view class="meta">有效期至 {{item.verificationExpiresAt || '课程后 7 天'}}</view>
+          </view>
+          <text class="badge {{item.verificationStatusClass}}">{{item.verificationStatusText}}</text>
+        </view>
+        <button wx:if="{{item.verificationStatus === 'active'}}" class="primary qr-button" data-id="{{item.id}}" bindtap="showQr">查看二维码</button>
+      </view>
+    </block>
+    <view wx:else class="empty">暂无可展示课程</view>
+  </view>
+
+  <view class="card">
     <view class="card-title">消课记录</view>
     <block wx:if="{{attendanceLogs.length}}">
       <view class="list-item" wx:for="{{attendanceLogs}}" wx:key="id">
@@ -36,5 +54,17 @@
       </view>
     </block>
     <view wx:else class="empty">暂无课程申请</view>
+  </view>
+
+  <view class="modal-mask" wx:if="{{qrVisible}}" bindtap="hideQr">
+    <view class="modal-card" catchtap="noop">
+      <view class="modal-title">课程核销码</view>
+      <view class="modal-meta">{{qrSchedule.dayLabel}} {{qrSchedule.lessonTime}}</view>
+      <view class="modal-meta">{{qrSchedule.campus}} · {{qrSchedule.coach}}</view>
+      <canvas class="qr-canvas" canvas-id="qrCanvas"></canvas>
+      <view class="qr-code">{{qrSchedule.verificationPayload}}</view>
+      <view class="modal-meta">请出示给教练或老板扫码核销</view>
+      <button class="primary" bindtap="hideQr">完成</button>
+    </view>
   </view>
 </view>

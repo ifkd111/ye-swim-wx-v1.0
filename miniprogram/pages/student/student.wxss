@@ -2,15 +2,63 @@
   margin-top: 20rpx;
 }
 
+.profile-card {
+  background: linear-gradient(180deg, #ffffff 0%, #f5faff 100%);
+}
+
+.profile-avatar {
+  width: 88rpx;
+  height: 88rpx;
+  border-radius: 44rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a73e8;
+  color: #ffffff;
+  font-size: 36rpx;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.profile-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16rpx;
+  margin-top: 22rpx;
+}
+
+.profile-item {
+  width: calc((100% - 16rpx) / 2);
+  padding: 18rpx;
+  border-radius: 18rpx;
+  background: #f8fbff;
+  border: 1rpx solid #d8e5f7;
+}
+
+.profile-value {
+  display: block;
+  margin-top: 8rpx;
+  color: #10233f;
+  font-size: 26rpx;
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
 .action-metric {
   border-color: #1268cf;
 }
 
-.booking-button {
-  width: 100%;
-  margin-top: 18rpx;
+.action-button {
+  flex: 1;
+  min-width: 220rpx;
 }
 
 .row button.mini {
   flex-shrink: 0;
+}
+
+@media (max-width: 360px) {
+  .profile-item {
+    width: 100%;
+  }
 }

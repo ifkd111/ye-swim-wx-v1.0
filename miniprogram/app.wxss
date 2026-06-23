@@ -1,7 +1,22 @@
 page {
+  --color-brand: #1a73e8;
+  --color-brand-dark: #1268cf;
+  --color-brand-soft: #eef6ff;
+  --color-warning: #ffc107;
+  --color-danger: #c81e1e;
+  --color-text: #333333;
+  --color-text-strong: #10233f;
+  --color-text-muted: #5d7292;
+  --color-border: #d8e5f7;
+  --radius-button: 100rpx;
+  --radius-card: 24rpx;
+  --space-xs: 10rpx;
+  --space-base: 20rpx;
+  --space-md: 30rpx;
+  --space-lg: 40rpx;
   min-height: 100vh;
   background: #f4f8ff;
-  color: #10233f;
+  color: var(--color-text-strong);
   font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 28rpx;
 }
@@ -61,10 +76,10 @@ textarea {
 }
 
 .card {
-  border: 1rpx solid #d8e5f7;
-  border-radius: 16rpx;
+  border: 1rpx solid var(--color-border);
+  border-radius: var(--radius-card);
   padding: 24rpx;
-  margin-bottom: 20rpx;
+  margin-bottom: var(--space-base);
   background: #ffffff;
   box-shadow: 0 8rpx 24rpx rgba(31, 86, 145, 0.08);
 }
@@ -77,7 +92,7 @@ textarea {
 }
 
 .link-text {
-  color: #1d6fd8;
+  color: var(--color-brand);
   font-size: 24rpx;
   font-weight: 800;
 }
@@ -91,8 +106,8 @@ textarea {
 .metric {
   width: calc((100% - 16rpx) / 2);
   padding: 22rpx;
-  border-radius: 12rpx;
-  background: #eef6ff;
+  border-radius: 18rpx;
+  background: var(--color-brand-soft);
   border: 1rpx solid #d5e7fb;
   min-height: 144rpx;
 }
@@ -110,7 +125,7 @@ textarea {
 
 .metric-value {
   display: block;
-  color: #1268cf;
+  color: var(--color-brand-dark);
   font-size: 40rpx;
   font-weight: 800;
   line-height: 1.1;
@@ -127,7 +142,7 @@ textarea {
 .metric-action {
   margin-top: 8rpx;
   display: block;
-  color: #1d6fd8;
+  color: var(--color-brand);
   font-size: 22rpx;
   font-weight: 700;
 }
@@ -158,14 +173,14 @@ textarea {
 .name {
   font-size: 30rpx;
   font-weight: 800;
-  color: #10233f;
+  color: var(--color-text-strong);
   line-height: 1.35;
   overflow-wrap: anywhere;
 }
 
 .meta {
   margin-top: 6rpx;
-  color: #5d7292;
+  color: var(--color-text-muted);
   font-size: 23rpx;
   line-height: 1.45;
   overflow-wrap: anywhere;
@@ -206,7 +221,7 @@ textarea {
 button {
   margin: 0;
   min-height: 76rpx;
-  border-radius: 999rpx;
+  border-radius: var(--radius-button);
   padding: 0 28rpx;
   border: 1rpx solid #bdd5f4;
   background: #edf5ff;
@@ -217,8 +232,8 @@ button {
 }
 
 button.primary {
-  background: #1268cf;
-  border-color: #1268cf;
+  background: var(--color-brand-dark);
+  border-color: var(--color-brand-dark);
   color: #ffffff;
 }
 
@@ -246,7 +261,7 @@ textarea {
   min-height: 78rpx;
   border-radius: 14rpx;
   padding: 0 22rpx;
-  color: #10233f;
+  color: var(--color-text-strong);
   background: #f8fbff;
   border: 1rpx solid #c9dbf2;
 }
@@ -289,7 +304,7 @@ textarea {
   min-height: 144rpx;
   padding: 22rpx;
   border: 1rpx solid #d5e7fb;
-  border-radius: 14rpx;
+  border-radius: 18rpx;
   background: #f8fbff;
 }
 
@@ -322,7 +337,7 @@ textarea {
 .chip {
   min-height: 62rpx;
   padding: 0 24rpx;
-  border-radius: 999rpx;
+  border-radius: var(--radius-button);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -334,8 +349,8 @@ textarea {
 }
 
 .chip.active {
-  background: #1268cf;
-  border-color: #1268cf;
+  background: var(--color-brand-dark);
+  border-color: var(--color-brand-dark);
   color: #ffffff;
 }
 
@@ -393,7 +408,7 @@ textarea {
   min-height: 78rpx;
   border-radius: 14rpx;
   padding: 18rpx 22rpx;
-  color: #10233f;
+  color: var(--color-text-strong);
   background: #f8fbff;
   border: 1rpx solid #c9dbf2;
 }
@@ -410,6 +425,40 @@ textarea {
 .recommend:first-child {
   border-top: 0;
   padding-top: 0;
+}
+
+.modal-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  background: rgba(16, 35, 63, 0.42);
+}
+
+.modal-card {
+  width: 100%;
+  max-width: 620rpx;
+  padding: 32rpx;
+  border-radius: var(--radius-card);
+  background: #ffffff;
+  box-shadow: 0 24rpx 70rpx rgba(16, 35, 63, 0.2);
+  text-align: center;
+}
+
+.modal-title {
+  font-size: 32rpx;
+  font-weight: 800;
+  color: var(--color-text-strong);
+}
+
+.modal-meta {
+  margin-top: 8rpx;
+  color: var(--color-text-muted);
+  font-size: 24rpx;
+  line-height: 1.45;
 }
 
 .status-filter {

@@ -68,6 +68,54 @@ function lessonDeduction(productType) {
   return productType === "monthly" || productType === "camp" || productType === "vip" ? 0 : 1;
 }
 
+function normalizeVerificationCode(value) {
+  const raw = String(value || "").trim().toUpperCase();
+  const markerIndex = raw.indexOf("YS:");
+  const code = markerIndex >= 0 ? raw.slice(markerIndex + 3) : raw;
+  return code.replace(/[^0-9A-Z]/g, "").slice(0, 16);
+}
+
+function stableCode(value) {
+  const source = String(value || "YE-SWIM");
+  let hash = 5381;
+  for (let index = 0; index < source.length; index += 1) {
+    hash = ((hash * 33) ^ source.charCodeAt(index)) >>> 0;
+  }
+  return hash.toString(36).toUpperCase().padStart(8, "0").slice(-8);
+}
+
+function verificationCodeForSchedule(schedule) {
+  if (schedule && schedule.verificationCode) return normalizeVerificationCode(schedule.verificationCode);
+  const seed = [
+    schedule && (schedule._id || schedule.id || schedule.businessId),
+    schedule && schedule.lessonDate,
+    schedule && schedule.lessonTime,
+    schedule && schedule.memberId,
+    schedule && schedule.memberName
+  ].join("|");
+  return stableCode(seed);
+}
+
+function verificationPayload(code) {
+  return "YS:" + normalizeVerificationCode(code);
+}
+
+function verificationExpiresAt(lessonDate) {
+  const date = toDate(lessonDate);
+  if (Number.isNaN(date.getTime())) return "";
+  date.setDate(date.getDate() + 7);
+  date.setHours(23, 59, 59, 999);
+  return date.toISOString();
+}
+
+function verificationStatus(schedule, now) {
+  if (!schedule) return "missing";
+  if (schedule.verifiedAt || schedule.lessonStatus === "completed") return "verified";
+  const expiresAt = schedule.verificationExpiresAt || verificationExpiresAt(schedule.lessonDate);
+  if (expiresAt && new Date(expiresAt).getTime() < shanghaiNow(now).getTime()) return "expired";
+  return "active";
+}
+
 function memberStatus(member, usedLessons) {
   const total = Number(member.totalLessons || 0);
   const productType = member.productType || "class_pack";
@@ -95,5 +143,10 @@ module.exports = {
   isBookableForStudent,
   bookingRuleText,
   lessonDeduction,
+  normalizeVerificationCode,
+  verificationCodeForSchedule,
+  verificationPayload,
+  verificationExpiresAt,
+  verificationStatus,
   memberStatus
 };

@@ -198,6 +198,23 @@ function newId(prefix) {
   return prefix + "-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 7);
 }
 
+function verificationPatch(schedule) {
+  const code = rules.verificationCodeForSchedule(schedule);
+  return {
+    verificationCode: code,
+    verificationPayload: rules.verificationPayload(code),
+    verificationExpiresAt: rules.verificationExpiresAt(schedule.lessonDate)
+  };
+}
+
+function decorateVerification(schedule) {
+  const patch = verificationPatch(schedule);
+  return Object.assign({}, schedule, patch, {
+    verificationStatus: rules.verificationStatus(Object.assign({}, schedule, patch)),
+    verificationStatusText: schedule.verifiedAt || schedule.lessonStatus === "completed" ? "已核销" : rules.verificationStatus(Object.assign({}, schedule, patch)) === "expired" ? "已过期" : "待核销"
+  });
+}
+
 function activeAccount(state, account) {
   const normalized = rules.normalizeAccount(account);
   return state.accounts.find((item) => item.account === normalized && item.status !== "disabled");
@@ -247,6 +264,7 @@ function schedulesFor(state, viewer) {
       if (viewer.role === "student") return schedule.memberId === viewer.memberId;
       return false;
     })
+    .map(decorateVerification)
     .sort((a, b) => (a.lessonDate + a.lessonTime).localeCompare(b.lessonDate + b.lessonTime));
 }
 
@@ -606,6 +624,7 @@ function approveBookingRequest(state, viewer, payload) {
     lessonStatus: "pending",
     source: "student_booking"
   };
+  Object.assign(schedule, verificationPatch(schedule));
   state.schedules.push(schedule);
   request.status = "approved";
   request.reviewedAt = new Date().toISOString();
@@ -641,10 +660,8 @@ function cancelBookingRequest(state, viewer, payload) {
   return { message: "已取消预约", request };
 }
 
-function markAttendance(state, viewer, payload) {
+function completeScheduleAttendance(state, viewer, schedule, sourceNote, verificationCode) {
   assertRole(viewer, ["admin", "coach"]);
-  const schedule = state.schedules.find((item) => item.id === payload.scheduleId);
-  if (!schedule) throw new Error("排课不存在");
   if (viewer.role === "coach" && schedule.coach !== viewer.coachName) throw new Error("只能确认自己的课程");
 
   if (schedule.lessonStatus === "completed") {
@@ -663,13 +680,38 @@ function markAttendance(state, viewer, payload) {
     campus: schedule.campus,
     lessonsDeducted: deducted,
     sourceScheduleId: schedule.id,
-    source: "coach_checkin",
-    sourceNote: "小程序确认出勤"
+    source: verificationCode ? "qr_verify" : "coach_checkin",
+    sourceNote: sourceNote || (verificationCode ? "扫码核销" : "小程序确认出勤"),
+    verificationCode: verificationCode || schedule.verificationCode || ""
   };
   state.attendanceLogs.push(log);
   schedule.attended = true;
   schedule.lessonStatus = "completed";
+  if (verificationCode) {
+    schedule.verifiedAt = new Date().toISOString();
+    schedule.verifiedBy = viewer.account;
+    schedule.verificationSource = "scan";
+  }
   return { message: deducted ? "已确认出勤并扣 1 课时" : "已确认出勤，该课程类型不扣课时", log };
+}
+
+function markAttendance(state, viewer, payload) {
+  const schedule = state.schedules.find((item) => item.id === payload.scheduleId);
+  if (!schedule) throw new Error("排课不存在");
+  return completeScheduleAttendance(state, viewer, schedule, "小程序确认出勤", "");
+}
+
+function verifyScheduleQr(state, viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const code = rules.normalizeVerificationCode(payload.code || payload.qr || payload.scene);
+  if (!code) throw new Error("核销码不能为空");
+  const schedule = state.schedules.find((item) => rules.verificationCodeForSchedule(item) === code);
+  if (!schedule) throw new Error("核销码无效");
+  if (viewer.role === "coach" && schedule.coach !== viewer.coachName) throw new Error("只能核销自己的课程");
+  const status = rules.verificationStatus(Object.assign({}, schedule, verificationPatch(schedule)));
+  if (status === "verified") throw new Error("该课程已经核销");
+  if (status === "expired") throw new Error("核销码已过期，请联系管理员处理");
+  return completeScheduleAttendance(state, viewer, schedule, "扫码核销", code);
 }
 
 function createAvailabilitySlot(state, viewer, payload) {
@@ -733,6 +775,7 @@ function createManualSchedule(state, viewer, payload) {
   if (!schedule.lessonDate || !schedule.lessonTime || !schedule.campus || !schedule.coach) {
     throw new Error("日期、时间、校区、教练不能为空");
   }
+  Object.assign(schedule, verificationPatch(schedule));
   state.schedules.push(schedule);
   return { message: "管理员手动排课已创建", schedule };
 }
@@ -822,6 +865,7 @@ function call(action, payload) {
   else if (action === "rejectBookingRequest") result = rejectBookingRequest(state, viewer, payload);
   else if (action === "cancelBookingRequest") result = cancelBookingRequest(state, viewer, payload);
   else if (action === "markAttendance") result = markAttendance(state, viewer, payload);
+  else if (action === "verifyScheduleQr") result = verifyScheduleQr(state, viewer, payload);
   else if (action === "cancelSchedule") result = cancelSchedule(state, viewer, payload);
   else if (action === "approveCourseApplication") result = approveCourseApplication(state, viewer, payload);
   else if (action === "rejectCourseApplication") result = rejectCourseApplication(state, viewer, payload);

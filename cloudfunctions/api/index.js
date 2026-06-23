@@ -19,6 +19,15 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function verificationPatch(schedule) {
+  const code = rules.verificationCodeForSchedule(schedule);
+  return {
+    verificationCode: code,
+    verificationPayload: rules.verificationPayload(code),
+    verificationExpiresAt: rules.verificationExpiresAt(schedule.lessonDate)
+  };
+}
+
 function hashPassword(password, salt) {
   return crypto.pbkdf2Sync(String(password), salt, 120000, 32, "sha256").toString("hex");
 }
@@ -35,6 +44,16 @@ function withId(doc) {
     result.id = result._id;
   }
   return result;
+}
+
+function decorateVerification(doc) {
+  const schedule = withId(doc);
+  const patch = verificationPatch(schedule);
+  const status = rules.verificationStatus(Object.assign({}, schedule, patch));
+  return Object.assign({}, schedule, patch, {
+    verificationStatus: status,
+    verificationStatusText: status === "verified" ? "已核销" : status === "expired" ? "已过期" : "待核销"
+  });
 }
 
 function docKey(doc) {
@@ -357,7 +376,7 @@ async function schedulesFor(viewer) {
     query = anyFieldQuery("memberId", rawDocKeys(member, viewer.memberId));
   }
   const schedules = await list("schedules", query, 1500);
-  return schedules.map(withId);
+  return schedules.map(decorateVerification);
 }
 
 async function availabilityFor(viewer) {
@@ -681,6 +700,8 @@ async function approveBookingRequest(viewer, payload) {
     updatedAt: nowIso()
   };
   const result = await db.collection("schedules").add({ data: schedule });
+  const patch = verificationPatch(Object.assign({ _id: result._id }, schedule));
+  await db.collection("schedules").doc(result._id).update({ data: patch });
   await db.collection("bookingRequests").doc(docKey(request)).update({
     data: {
       status: "approved",
@@ -690,7 +711,7 @@ async function approveBookingRequest(viewer, payload) {
       updatedAt: nowIso()
     }
   });
-  return { message: "已通过预约并生成排课", schedule: Object.assign({ id: result._id }, schedule) };
+  return { message: "已通过预约并生成排课", schedule: Object.assign({ id: result._id }, schedule, patch) };
 }
 
 async function rejectBookingRequest(viewer, payload) {
@@ -741,15 +762,13 @@ async function cancelBookingRequest(viewer, payload) {
   return { message: "已取消预约", request: withId(Object.assign({}, request, { status: "cancelled_by_admin" })) };
 }
 
-async function markAttendance(viewer, payload) {
+async function completeScheduleAttendance(viewer, schedule, sourceNote, verificationCode) {
   assertRole(viewer, ["admin", "coach"]);
-  const schedule = await findOneByAnyId("schedules", payload.scheduleId);
-  if (!schedule) throw new Error("排课不存在");
   if (viewer.role === "coach" && schedule.coach !== viewer.coachName) throw new Error("只能确认自己的课程");
   if (schedule.lessonStatus === "completed") return { message: "该课程已经确认过出勤", schedule };
 
   const scheduleKey = docKey(schedule);
-  const existing = await list("attendanceLogs", anyFieldQuery("sourceScheduleId", rawDocKeys(schedule, payload.scheduleId)), 1);
+  const existing = await list("attendanceLogs", anyFieldQuery("sourceScheduleId", rawDocKeys(schedule, scheduleKey)), 1);
   if (existing.length) {
     await db.collection("schedules").doc(scheduleKey).update({ data: { attended: true, lessonStatus: "completed", updatedAt: nowIso() } });
     return { message: "该课程已经有消课记录，已同步为完成" };
@@ -765,13 +784,53 @@ async function markAttendance(viewer, payload) {
     campus: schedule.campus,
     lessonsDeducted: rules.lessonDeduction(member.productType),
     sourceScheduleId: scheduleKey,
-    source: "coach_checkin",
-    sourceNote: "小程序确认出勤",
+    source: verificationCode ? "qr_verify" : "coach_checkin",
+    sourceNote: sourceNote || (verificationCode ? "扫码核销" : "小程序确认出勤"),
+    verificationCode: verificationCode || schedule.verificationCode || "",
     createdAt: nowIso()
   };
   await db.collection("attendanceLogs").add({ data: log });
-  await db.collection("schedules").doc(scheduleKey).update({ data: { attended: true, lessonStatus: "completed", updatedAt: nowIso() } });
+  const schedulePatch = {
+    attended: true,
+    lessonStatus: "completed",
+    updatedAt: nowIso()
+  };
+  if (verificationCode) {
+    schedulePatch.verifiedAt = nowIso();
+    schedulePatch.verifiedBy = viewer.account;
+    schedulePatch.verificationSource = "scan";
+  }
+  await db.collection("schedules").doc(scheduleKey).update({ data: schedulePatch });
   return { message: log.lessonsDeducted ? "已确认出勤并扣 1 课时" : "已确认出勤，该课程类型不扣课时", log };
+}
+
+async function markAttendance(viewer, payload) {
+  const schedule = await findOneByAnyId("schedules", payload.scheduleId);
+  if (!schedule) throw new Error("排课不存在");
+  return completeScheduleAttendance(viewer, schedule, "小程序确认出勤", "");
+}
+
+async function findScheduleByVerificationCode(code) {
+  const normalized = rules.normalizeVerificationCode(code);
+  if (!normalized) return null;
+  const direct = await list("schedules", { verificationCode: normalized }, 1);
+  if (direct.length) return direct[0];
+  const schedules = await list("schedules", { lessonStatus: _.neq("cancelled") }, 1500);
+  return schedules.find((schedule) => rules.verificationCodeForSchedule(schedule) === normalized) || null;
+}
+
+async function verifyScheduleQr(viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const code = rules.normalizeVerificationCode(payload.code || payload.qr || payload.scene);
+  if (!code) throw new Error("核销码不能为空");
+  const schedule = await findScheduleByVerificationCode(code);
+  if (!schedule) throw new Error("核销码无效");
+  if (viewer.role === "coach" && schedule.coach !== viewer.coachName) throw new Error("只能核销自己的课程");
+  const patch = verificationPatch(schedule);
+  const status = rules.verificationStatus(Object.assign({}, schedule, patch));
+  if (status === "verified") throw new Error("该课程已经核销");
+  if (status === "expired") throw new Error("核销码已过期，请联系管理员处理");
+  return completeScheduleAttendance(viewer, schedule, "扫码核销", code);
 }
 
 async function createAvailabilitySlot(viewer, payload) {
@@ -841,7 +900,9 @@ async function createManualSchedule(viewer, payload) {
   };
   if (!schedule.lessonDate || !schedule.lessonTime || !schedule.campus || !schedule.coach) throw new Error("日期、时间、校区、教练不能为空");
   const result = await db.collection("schedules").add({ data: schedule });
-  return { message: "管理员手动排课已创建", schedule: Object.assign({ id: result._id }, schedule) };
+  const patch = verificationPatch(Object.assign({ _id: result._id }, schedule));
+  await db.collection("schedules").doc(result._id).update({ data: patch });
+  return { message: "管理员手动排课已创建", schedule: Object.assign({ id: result._id }, schedule, patch) };
 }
 
 async function cancelSchedule(viewer, payload) {
@@ -950,6 +1011,7 @@ exports.main = async (event) => {
       rejectBookingRequest,
       cancelBookingRequest,
       markAttendance,
+      verifyScheduleQr,
       cancelSchedule,
       approveCourseApplication,
       rejectCourseApplication,
