@@ -2,6 +2,14 @@ function normalizeAccount(value) {
   return String(value || "").trim().toLowerCase();
 }
 
+function normalizePhone(value) {
+  return String(value || "").replace(/\D/g, "").slice(0, 11);
+}
+
+function isChinaMobile(value) {
+  return /^1[3-9]\d{9}$/.test(normalizePhone(value));
+}
+
 function roleFromAccount(account) {
   const normalized = normalizeAccount(account);
   if (normalized === "yeats") return "admin";
@@ -49,13 +57,22 @@ function sortByDateTime(a, b, dateField, timeField) {
 
 function minStudentBookingDate(now) {
   const current = shanghaiNow(now);
-  const min = new Date(current);
-  min.setDate(min.getDate() + (current.getHours() >= 20 ? 2 : 1));
-  return formatDateChina(min);
+  return formatDateChina(current);
 }
 
 function isBookableForStudent(slotDate, now) {
   return String(slotDate || "") >= minStudentBookingDate(now);
+}
+
+function isBookableSlot(slotDate, slotTime, now) {
+  const current = shanghaiNow(now);
+  const today = formatDateChina(current);
+  const value = String(slotDate || "");
+  if (value > today) return true;
+  if (value < today) return false;
+  const match = String(slotTime || "").split("-")[0].match(/^(\d{1,2}):(\d{2})$/);
+  if (!match) return true;
+  return Number(match[1]) * 60 + Number(match[2]) > current.getHours() * 60 + current.getMinutes();
 }
 
 function lessonDeduction(productType) {
@@ -126,6 +143,8 @@ function memberStatus(member, usedLessons) {
 
 module.exports = {
   normalizeAccount,
+  normalizePhone,
+  isChinaMobile,
   roleFromAccount,
   shanghaiNow,
   formatDateChina,
@@ -135,6 +154,7 @@ module.exports = {
   sortByDateTime,
   minStudentBookingDate,
   isBookableForStudent,
+  isBookableSlot,
   lessonDeduction,
   normalizeVerificationCode,
   verificationCodeForSchedule,

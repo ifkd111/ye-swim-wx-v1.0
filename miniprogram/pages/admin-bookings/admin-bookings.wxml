@@ -18,7 +18,7 @@
           <text class="badge {{item.status === 'pending' ? 'warn' : ''}}">{{statusText[item.status]}}</text>
         </view>
         <view class="toolbar" wx:if="{{item.status === 'pending'}}">
-          <button class="primary" data-id="{{item.id}}" bindtap="approve">通过</button>
+          <button class="primary" data-id="{{item.id}}" bindtap="approve">发布课程</button>
           <button class="danger" data-id="{{item.id}}" bindtap="reject">拒绝</button>
           <button class="mini danger" data-id="{{item.id}}" bindtap="cancel">取消</button>
         </view>

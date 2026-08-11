@@ -1,5 +1,6 @@
 const api = require("../../utils/api");
 const rules = require("../../utils/rules");
+const subscribe = require("../../utils/subscribe");
 
 Page({
   data: {
@@ -8,6 +9,7 @@ Page({
     visibleSlots: [],
     recommended: [],
     bookings: [],
+    bookingSlotId: "",
     filter: "all",
     statusText: {
       pending: "待审批",
@@ -27,7 +29,7 @@ Page({
     api.call("getHomeData").then((data) => {
       const bookings = (data.bookingRequests || []).map((item) => Object.assign({}, item, {
         statusClass: item.status === "pending" ? "warn" : item.status === "rejected" || item.status === "cancelled_by_student" || item.status === "cancelled_by_admin" ? "danger" : "",
-        statusTip: item.status === "pending" ? "老板确认后才算预约成功" : item.status === "approved" ? "已生成正式课程" : item.status === "rejected" ? "可重新选择其他时间" : "该预约已取消"
+        statusTip: item.status === "approved" ? "已约好，到时间上课即可" : item.status === "pending" ? "处理中" : item.status === "rejected" ? "可重新选择其他时间" : "该预约已取消"
       }));
       const activeBySlot = {};
       bookings.forEach((booking) => {
@@ -70,13 +72,14 @@ Page({
   },
 
   confirmBook(event) {
+    if (this.data.bookingSlotId) return;
     const slotId = event.currentTarget.dataset.id;
     const slot = this.data.slots.find((item) => item.id === slotId);
     if (!slot) return;
     wx.showModal({
       title: "确认预约",
-      content: slot.dayLabel + " " + slot.slotTime + "\n" + slot.campus + " · " + slot.coach + "\n提交后等待老板确认",
-      confirmText: "提交",
+      content: slot.dayLabel + " " + slot.slotTime + "\n" + slot.campus + " · " + slot.coach + "\n确认后生成课程草稿，由老板发布",
+      confirmText: "生成草稿",
       success: (res) => {
         if (res.confirm) this.book(slot.id);
       }
@@ -84,17 +87,21 @@ Page({
   },
 
   book(slotId) {
+    if (this.data.bookingSlotId) return;
+    this.setData({ bookingSlotId: slotId });
     api.syncing("正在提交");
-    api
+    subscribe.request(["bookingResult"]).then(() => api
       .call("createBookingRequest", {
         slotId,
         note: ""
       })
+    )
       .then((result) => {
         api.done(result.message);
         this.load();
       })
-      .catch(api.fail);
+      .catch(api.fail)
+      .finally(() => this.setData({ bookingSlotId: "" }));
   },
 
   cancelBooking(event) {

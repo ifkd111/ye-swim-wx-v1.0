@@ -1,0 +1,32 @@
+.coach-admin-page { padding-bottom: 70rpx; }
+.filter-section { padding: 18rpx; }
+.search-input { min-height: 70rpx; background: #f5f7f5; border-color: #e0e6e1; }
+.coach-filter-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9rpx; margin-top: 14rpx; }
+.filter-block { padding: 15rpx 4rpx; border: 1rpx solid #e1e6e2; border-radius: 14rpx; background: #f5f7f5; color: #718079; font-size: 20rpx; font-weight: 800; text-align: center; }
+.filter-block.active { color: #fff; background: #176f63; border-color: #176f63; }
+.coach-card { margin-bottom: 14rpx; padding: 22rpx; border: 1rpx solid #e1e6e2; border-radius: 21rpx; background: #fff; box-shadow: 0 5rpx 18rpx rgba(28,51,43,.05); }
+.coach-card-head, .coach-identity, .card-actions { display: flex; align-items: center; }
+.coach-card-head { justify-content: space-between; gap: 14rpx; }
+.coach-identity { min-width: 0; flex: 1; gap: 14rpx; }
+.coach-list-avatar { width: 66rpx; height: 66rpx; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 19rpx; background: #dcebe6; color: #176f63; font-size: 28rpx; font-weight: 850; }
+.coach-list-name { font-size: 29rpx; font-weight: 850; }
+.coach-account { margin-top: 5rpx; color: #7a857f; font-size: 21rpx; }
+.coach-facts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12rpx; margin-top: 18rpx; }
+.coach-facts > view { padding: 15rpx 17rpx; border-radius: 15rpx; background: #f5f7f5; }
+.fact-value, .fact-label { display: block; }
+.fact-value { color: #233a33; font-size: 25rpx; font-weight: 850; }
+.fact-label { margin-top: 4rpx; color: #7c8781; font-size: 19rpx; }
+.card-actions { justify-content: flex-end; gap: 10rpx; margin-top: 17rpx; padding-top: 16rpx; border-top: 1rpx solid #edf0ed; }
+.edit-link { margin-right: auto; color: #176f63; font-size: 22rpx; font-weight: 850; }
+button.danger-lite { color: #9c554b; background: #faf0ee; border-color: #efd6d1; }
+.form-header { margin: 4rpx 2rpx 24rpx; }
+.form-header > text { display: block; margin-bottom: 20rpx; color: #176f63; font-size: 23rpx; font-weight: 800; }
+.coach-form { padding: 26rpx; }
+.account-strip { display: flex; justify-content: space-between; margin-bottom: 22rpx; padding: 17rpx 19rpx; border-radius: 15rpx; background: #f1f4f2; color: #6e7973; font-size: 22rpx; }
+.account-strip text:last-child { color: #253b34; font-weight: 850; }
+.option-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10rpx; }
+.option-board.two { grid-template-columns: repeat(2, 1fr); }
+.option-block { min-height: 70rpx; padding: 18rpx 8rpx; border: 2rpx solid #e0e6e1; border-radius: 15rpx; background: #f7f9f7; color: #63716a; text-align: center; font-size: 23rpx; font-weight: 800; }
+.option-block.active { border-color: #176f63; background: #e8f4f0; color: #176f63; }
+.option-block.danger-active { border-color: #b76c60; background: #faece9; color: #9b4e44; }
+@media (max-width: 360px) { .coach-filter-row { grid-template-columns: repeat(2, 1fr); } }

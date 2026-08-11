@@ -68,3 +68,30 @@
   width: 100%;
   margin-top: 22rpx;
 }
+
+.login-tabs {
+  margin: 28rpx 0 24rpx;
+}
+
+.login-tip {
+  margin-top: 18rpx;
+  color: #5d7292;
+  font-size: 24rpx;
+  line-height: 1.45;
+  text-align: center;
+}
+
+.test-panel {
+  margin-top: 18rpx;
+}
+
+.role-grid {
+  display: flex;
+  gap: 12rpx;
+  margin-top: 14rpx;
+}
+
+.role-grid button {
+  flex: 1;
+  min-width: 0;
+}

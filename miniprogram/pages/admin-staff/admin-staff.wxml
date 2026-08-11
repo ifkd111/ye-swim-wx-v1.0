@@ -14,13 +14,17 @@
         <text class="field-label">账号</text>
         <input value="{{form.account}}" disabled="{{!!form.id}}" placeholder="jl002 / xy002" bindinput="input" data-field="account" />
       </view>
-      <view class="field">
+      <view class="field" wx:if="{{formRole === 'admin'}}">
         <text class="field-label">密码</text>
-        <input password value="{{form.password}}" placeholder="留空则使用系统默认密码" bindinput="input" data-field="password" />
+        <input password value="{{form.password}}" placeholder="留空则保持原密码" bindinput="input" data-field="password" />
       </view>
       <view class="field">
         <text class="field-label">备注名</text>
         <input value="{{form.fullName}}" placeholder="教练名或学员名" bindinput="input" data-field="fullName" />
+      </view>
+      <view class="field">
+        <text class="field-label">手机号</text>
+        <input type="number" maxlength="11" value="{{form.phone}}" placeholder="教练/学员必填" bindinput="input" data-field="phone" />
       </view>
       <view class="field">
         <text class="field-label">校区</text>
@@ -36,8 +40,9 @@
       </view>
     </view>
     <view class="role-hint">当前会进入：{{formRoleText}}</view>
+    <view class="meta" wx:if="{{formRole === 'coach' || formRole === 'student'}}">教练和学员只用手机号验证；修改手机号会自动解除旧微信绑定。</view>
     <button class="primary" bindtap="saveAccount">保存账号</button>
-    <button wx:if="{{form.id}}" class="danger reset-button" bindtap="resetPassword">重置为默认密码</button>
+    <button wx:if="{{form.id && formRole === 'admin'}}" class="danger reset-button" bindtap="resetPassword">重置老板密码</button>
   </view>
 
   <view class="card">
@@ -47,12 +52,15 @@
           <view>
             <view class="name">{{item.account}}</view>
             <view class="meta">{{roleText[item.role]}} · {{item.fullName || item.coachName || item.memberName || item.memberId}}</view>
-            <view class="meta" wx:if="{{item.openid}}">已绑定微信</view>
+            <view class="meta" wx:if="{{item.phone}}">手机号 {{item.phone}}</view>
+            <view class="meta" wx:if="{{item.wechatBound}}">已绑定微信</view>
+            <view class="meta" wx:else>待绑定微信</view>
           </view>
           <view class="right-stack">
             <text class="badge">{{item.status === 'disabled' ? '停用' : '启用'}}</text>
             <text class="link-text">编辑</text>
           </view>
+          <button wx:if="{{item.role !== 'admin' && item.wechatBound}}" class="mini danger" data-id="{{item.id}}" catchtap="unbindWechat">解除微信</button>
         </view>
       </view>
     </block>

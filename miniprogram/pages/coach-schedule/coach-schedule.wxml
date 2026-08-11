@@ -33,9 +33,24 @@
           </view>
           <text class="badge {{item.statusClass}}">{{item.statusText}}</text>
         </view>
-        <button wx:if="{{item.lessonStatus !== 'completed'}}" class="primary confirm-button" data-id="{{item.id}}" bindtap="mark">确认出勤</button>
+        <button wx:if="{{item.canMark}}" class="primary confirm-button" data-id="{{item.id}}" bindtap="mark">确认出勤</button>
       </view>
     </block>
     <view wx:else class="empty">暂无排课</view>
+  </view>
+
+  <view class="modal-mask" wx:if="{{feedbackVisible}}" bindtap="hideFeedback">
+    <view class="modal-card" catchtap="noop">
+      <view class="modal-title">课后反馈</view>
+      <view class="modal-meta">选择标签或写一句成长记录</view>
+      <view class="chip-list status-filter">
+        <view class="chip {{item.selected ? 'active' : ''}}" wx:for="{{feedbackOptions}}" wx:key="label" data-tag="{{item.label}}" bindtap="toggleFeedbackTag">{{item.label}}</view>
+      </view>
+      <view class="field"><textarea value="{{feedbackNote}}" placeholder="例如：换气节奏更稳，后半节注意腿部发力" bindinput="feedbackNoteInput" /></view>
+      <view class="toolbar">
+        <button bindtap="hideFeedback">稍后</button>
+        <button class="primary" bindtap="submitFeedback">保存反馈</button>
+      </view>
+    </view>
   </view>
 </view>

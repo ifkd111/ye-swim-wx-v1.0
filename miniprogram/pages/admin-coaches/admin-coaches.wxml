@@ -1,0 +1,47 @@
+<view class="page coach-admin-page">
+  <block wx:if="{{viewMode === 'list'}}">
+    <view class="app-header">
+      <view><view class="eyebrow">人员与登录</view><view class="title">教练</view><view class="subtitle">{{filterStats.active}} 位启用 · {{filterStats.pending}} 位待绑定微信</view></view>
+      <button class="primary mini" bindtap="openCreate">新增教练</button>
+    </view>
+
+    <view class="section filter-section">
+      <input class="search-input" value="{{keyword}}" placeholder="搜索姓名、手机号、校区" bindinput="search" />
+      <view class="coach-filter-row">
+        <view class="filter-block {{filter === 'all' ? 'active' : ''}}" data-filter="all" bindtap="setFilter">全部 {{filterStats.all}}</view>
+        <view class="filter-block {{filter === 'active' ? 'active' : ''}}" data-filter="active" bindtap="setFilter">启用 {{filterStats.active}}</view>
+        <view class="filter-block {{filter === 'pending' ? 'active' : ''}}" data-filter="pending" bindtap="setFilter">待绑定 {{filterStats.pending}}</view>
+        <view class="filter-block {{filter === 'disabled' ? 'active' : ''}}" data-filter="disabled" bindtap="setFilter">停用 {{filterStats.disabled}}</view>
+      </view>
+    </view>
+
+    <view class="coach-card" wx:for="{{coaches}}" wx:key="id" data-id="{{item.id}}" bindtap="editCoach">
+      <view class="coach-card-head">
+        <view class="coach-identity"><view class="coach-list-avatar">{{item.initial}}</view><view><view class="coach-list-name">{{item.coachName}}</view><view class="coach-account">{{item.account}} · {{item.campus || '未设校区'}}</view></view></view>
+        <text class="status {{item.status === 'disabled' ? 'muted' : item.wechatBound ? '' : 'warn'}}">{{item.status === 'disabled' ? '已停用' : item.bindingText}}</text>
+      </view>
+      <view class="coach-facts">
+        <view><text class="fact-value">{{item.phone || '未登记'}}</text><text class="fact-label">登录手机号</text></view>
+        <view><text class="fact-value">{{item.memberCount}}</text><text class="fact-label">名关联学员</text></view>
+      </view>
+      <view class="card-actions">
+        <text class="edit-link">编辑资料</text>
+        <button wx:if="{{item.wechatBound}}" class="block-button quiet" data-id="{{item.id}}" catchtap="unbindWechat">解除微信</button>
+        <button class="block-button {{item.status === 'disabled' ? '' : 'danger-lite'}}" data-id="{{item.id}}" catchtap="toggleCoach">{{item.status === 'disabled' ? '启用' : '停用'}}</button>
+      </view>
+    </view>
+    <view wx:if="{{!coaches.length}}" class="section calm-empty">没有符合条件的教练，点击右上角直接添加。</view>
+  </block>
+
+  <block wx:else>
+    <view class="form-header"><text bindtap="closeForm">‹ 返回教练列表</text><view class="title">{{form.id ? '编辑教练' : '新增教练'}}</view><view class="subtitle">保存后，教练直接用登记手机号验证登录</view></view>
+    <view class="section coach-form">
+      <view class="account-strip"><text>登录账号</text><text>{{form.account}}</text></view>
+      <view class="field"><text class="field-label">教练姓名</text><input value="{{form.fullName}}" placeholder="例如：张教练" data-field="fullName" bindinput="input" /></view>
+      <view class="field"><text class="field-label">手机号</text><input type="number" maxlength="11" value="{{form.phone}}" placeholder="用于微信手机号验证登录" data-field="phone" bindinput="input" /></view>
+      <view class="field"><text class="field-label">主要校区</text><view class="option-board"><view class="option-block {{form.campus === item ? 'active' : ''}}" wx:for="{{campusOptions}}" wx:key="*this" data-value="{{item}}" bindtap="selectCampus">{{item}}</view></view></view>
+      <view class="field" wx:if="{{form.id}}"><text class="field-label">账号状态</text><view class="option-board two"><view class="option-block {{form.status !== 'disabled' ? 'active' : ''}}" data-value="active" bindtap="selectStatus">启用</view><view class="option-block {{form.status === 'disabled' ? 'danger-active' : ''}}" data-value="disabled" bindtap="selectStatus">停用</view></view></view>
+      <button class="primary wide-action" loading="{{saving}}" bindtap="saveCoach">保存教练</button>
+    </view>
+  </block>
+</view>

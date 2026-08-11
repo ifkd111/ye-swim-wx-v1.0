@@ -53,8 +53,11 @@ function main() {
   assert(versionMatch && versionMatch[1] === pkg.version, "miniprogram/env.js 版本号应与 package.json 一致");
 
   const useMockMatch = envSource.match(/useMock:\s*(true|false)/);
+  const envConfig = require(envPath);
   const loginSource = fs.readFileSync(loginWxmlPath, "utf8");
   if (useMockMatch && useMockMatch[1] === "false") {
+    assert(!envConfig.testLogin || !envConfig.testLogin.enabled, "正式环境不应开启测试登录入口");
+    assert(!envConfig.testLogin || !envConfig.testLogin.phone, "正式环境不应内置测试手机号");
     ["1324", "1234", "yeats", "jl001", "xy001"].forEach((hint) => {
       assert(!loginSource.includes(hint), "正式环境登录页不应展示默认账号或密码：" + hint);
     });
@@ -69,24 +72,35 @@ function main() {
 
   [
     "login",
+    "loginByPhone",
+    "loginForTest",
     "getHomeData",
+    "listPagedData",
     "saveMember",
     "bulkImportMembers",
     "saveAccount",
     "resetAccountPassword",
     "changeMyPassword",
+    "unbindAccountWechat",
+    "saveWeeklyAvailabilityTemplate",
     "createBookingRequest",
     "approveBookingRequest",
     "rejectBookingRequest",
     "cancelBookingRequest",
     "markAttendance",
     "verifyScheduleQr",
+    "submitLessonFeedback",
+    "createLeaveRequest",
+    "approveLeaveRequest",
+    "rejectLeaveRequest",
+    "createMakeupSchedule",
     "cancelSchedule",
     "approveCourseApplication",
     "rejectCourseApplication",
     "createAvailabilitySlot",
     "createAvailabilitySlots",
     "publishAvailabilitySlot",
+    "closeAvailabilitySlot",
     "createManualSchedule",
     "createCourseApplication"
   ].forEach((action) => {

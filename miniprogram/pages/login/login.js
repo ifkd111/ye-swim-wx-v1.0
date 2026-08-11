@@ -1,10 +1,21 @@
 const api = require("../../utils/api");
 const env = require("../../env");
+const runtime = require("../../utils/runtime");
+
+const developerMock = runtime.developerMockEnabled();
+const useMock = runtime.useMock();
+const testLogin = developerMock
+  ? { enabled: true, phone: env.developerMock.phone, developerOnly: true }
+  : env.testLogin || {};
 
 Page({
   data: {
-    account: env.useMock ? "yeats" : "",
-    password: env.useMock ? "1324" : "",
+    mode: "phone",
+    account: useMock ? "yeats" : "",
+    password: useMock ? "1324" : "",
+    phone: testLogin.phone || (useMock ? "13333330002" : ""),
+    useMock,
+    testLogin,
     loading: false
   },
 
@@ -23,6 +34,14 @@ Page({
     this.setData({ password: event.detail.value });
   },
 
+  onPhoneInput(event) {
+    this.setData({ phone: event.detail.value });
+  },
+
+  setMode(event) {
+    this.setData({ mode: event.currentTarget.dataset.mode });
+  },
+
   login() {
     if (this.data.loading) return;
     this.setData({ loading: true });
@@ -31,6 +50,45 @@ Page({
         account: this.data.account,
         password: this.data.password,
         openid: "mock-openid"
+      })
+      .then((result) => {
+        api.saveSession(result.session);
+        wx.reLaunch({ url: api.homePath(result.session.role) });
+      })
+      .catch(api.fail)
+      .finally(() => this.setData({ loading: false }));
+  },
+
+  phoneLogin(event) {
+    if (this.data.loading) return;
+    const phoneCode = event && event.detail && event.detail.code;
+    if (!this.data.useMock && !phoneCode) {
+      api.toast("需要授权手机号后才能登录");
+      return;
+    }
+    this.setData({ loading: true });
+    api
+      .call("loginByPhone", {
+        phoneCode,
+        phone: this.data.phone,
+        openid: "mock-phone-" + this.data.phone
+      })
+      .then((result) => {
+        api.saveSession(result.session);
+        wx.reLaunch({ url: api.homePath(result.session.role) });
+      })
+      .catch(api.fail)
+      .finally(() => this.setData({ loading: false }));
+  },
+
+  testLogin(event) {
+    if (this.data.loading) return;
+    const role = event.currentTarget.dataset.role;
+    this.setData({ loading: true });
+    api
+      .call("loginForTest", {
+        phone: this.data.phone,
+        role
       })
       .then((result) => {
         api.saveSession(result.session);

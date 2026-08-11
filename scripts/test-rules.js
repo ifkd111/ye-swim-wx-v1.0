@@ -10,12 +10,15 @@ function testRole() {
 }
 
 function testBookingDate() {
-  assert.strictEqual(rules.minStudentBookingDate("2026-05-25T11:59:00+08:00"), "2026-05-26");
-  assert.strictEqual(rules.minStudentBookingDate("2026-05-25T20:00:00+08:00"), "2026-05-27");
-  assert.strictEqual(rules.isBookableForStudent("2026-05-25", "2026-05-25T11:59:00+08:00"), false);
+  assert.strictEqual(rules.minStudentBookingDate("2026-05-25T11:59:00+08:00"), "2026-05-25");
+  assert.strictEqual(rules.minStudentBookingDate("2026-05-25T20:00:00+08:00"), "2026-05-25");
+  assert.strictEqual(rules.isBookableForStudent("2026-05-25", "2026-05-25T11:59:00+08:00"), true);
   assert.strictEqual(rules.isBookableForStudent("2026-05-26", "2026-05-25T11:59:00+08:00"), true);
-  assert.strictEqual(rules.isBookableForStudent("2026-05-26", "2026-05-25T20:00:00+08:00"), false);
+  assert.strictEqual(rules.isBookableForStudent("2026-05-26", "2026-05-25T20:00:00+08:00"), true);
   assert.strictEqual(rules.isBookableForStudent("2026-05-27", "2026-05-25T20:00:00+08:00"), true);
+  assert.strictEqual(rules.isBookableSlot("2026-05-25", "19:00-20:00", "2026-05-25T18:30:00+08:00"), true);
+  assert.strictEqual(rules.isBookableSlot("2026-05-25", "18:00-19:00", "2026-05-25T18:30:00+08:00"), false);
+  assert.strictEqual(rules.isBookableSlot("2026-05-26", "08:00-09:00", "2026-05-25T23:30:00+08:00"), true);
 }
 
 function testDeduction() {

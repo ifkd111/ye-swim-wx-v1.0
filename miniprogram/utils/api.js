@@ -1,5 +1,6 @@
 const env = require("../env");
 const mock = require("./mock-store");
+const runtime = require("./runtime");
 
 function currentSession() {
   return wx.getStorageSync("session") || null;
@@ -20,7 +21,7 @@ function call(action, payload) {
     session: currentSession()
   });
 
-  if (env.useMock) {
+  if (runtime.useMock()) {
     return new Promise((resolve, reject) => {
       try {
         resolve(mock.call(action, data));
@@ -41,7 +42,12 @@ function call(action, payload) {
     .then((response) => {
       const result = response.result || {};
       if (!result.ok) {
-        throw new Error(result.message || "操作失败");
+        const message = result.message || "操作失败";
+        if (/登录已过期/.test(message)) {
+          clearSession();
+          wx.reLaunch({ url: "/pages/login/login" });
+        }
+        throw new Error(message);
       }
       return result.data;
     });

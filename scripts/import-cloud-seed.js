@@ -70,7 +70,7 @@ async function invoke(accessToken, env, action, payload) {
     body: JSON.stringify({
       action,
       payload: Object.assign({}, payload, {
-        seedSecret: process.env.YE_SWIM_SEED_SECRET || "ye-swim-local-seed-v1"
+        seedSecret: requireValue(process.env.YE_SWIM_SEED_SECRET, "缺少 YE_SWIM_SEED_SECRET")
       })
     })
   });

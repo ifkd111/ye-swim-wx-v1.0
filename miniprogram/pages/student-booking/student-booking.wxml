@@ -1,8 +1,8 @@
 <view class="page">
-  <view class="topbar"><view><view class="title">预约课程</view><view class="subtitle">{{ruleText}}</view></view></view>
+  <view class="topbar"><view><view class="title">选课</view><view class="subtitle">选一个时间，确认后直接生成课程</view></view></view>
 
   <view class="card hero-card">
-    <view class="card-title">推荐预约</view>
+    <view class="card-title">最快可约</view>
     <block wx:if="{{recommended.length}}">
       <view class="recommend tappable" wx:for="{{recommended}}" wx:key="id" data-id="{{item.id}}" bindtap="confirmBook">
         <view><view class="name">{{item.dayLabel}} {{item.slotTime}}</view><view class="meta">{{item.campus}} · {{item.coach}} · 剩余 {{item.left}} 位</view></view>
@@ -12,22 +12,22 @@
     <view wx:else class="empty">暂无推荐时间</view>
   </view>
 
-  <view class="card"><view class="card-title">按时间找</view><view class="chip-list"><view class="chip {{filter === 'all' ? 'active' : ''}}" bindtap="setFilter" data-filter="all">全部</view><view class="chip {{filter === 'tomorrow' ? 'active' : ''}}" bindtap="setFilter" data-filter="tomorrow">明天起</view><view class="chip {{filter === 'week' ? 'active' : ''}}" bindtap="setFilter" data-filter="week">本周</view><view class="chip {{filter === 'weekend' ? 'active' : ''}}" bindtap="setFilter" data-filter="weekend">周末</view></view></view>
+  <view class="card"><view class="card-title">筛选</view><view class="chip-list"><view class="chip {{filter === 'all' ? 'active' : ''}}" bindtap="setFilter" data-filter="all">全部</view><view class="chip {{filter === 'tomorrow' ? 'active' : ''}}" bindtap="setFilter" data-filter="tomorrow">明天起</view><view class="chip {{filter === 'week' ? 'active' : ''}}" bindtap="setFilter" data-filter="week">本周</view><view class="chip {{filter === 'weekend' ? 'active' : ''}}" bindtap="setFilter" data-filter="weekend">周末</view></view></view>
 
   <view class="card">
-    <view class="card-title">可约时间</view>
+    <view class="card-title">可选课程</view>
     <block wx:if="{{visibleSlots.length}}"><view class="list-item tappable" wx:for="{{visibleSlots}}" wx:key="id" data-id="{{item.id}}" bindtap="confirmBook"><view class="row"><view><view class="name">{{item.dayLabel}} {{item.slotTime}}</view><view class="meta">{{item.campus}} · {{item.coach}} · 已约 {{item.bookedCount || 0}}/{{item.capacity}} · 剩余 {{item.left}} 位</view></view><text class="badge">可约</text></view></view></block>
     <view wx:else class="empty">暂无可预约时间</view>
   </view>
 
   <view class="card">
-    <view class="card-title">我的预约</view>
+    <view class="card-title">已选课程</view>
     <block wx:if="{{bookings.length}}">
       <view class="list-item" wx:for="{{bookings}}" wx:key="id">
         <view class="row"><view><view class="name">{{item.slotDate}} {{item.slotTime}}</view><view class="meta">{{item.coach}} · {{item.campus}}</view><view class="meta">{{item.statusTip}}</view><view class="meta" wx:if="{{item.rejectReason}}">原因：{{item.rejectReason}}</view></view><text class="badge {{item.statusClass}}">{{statusText[item.status] || '已取消'}}</text></view>
-        <button wx:if="{{item.status === 'pending'}}" class="mini danger" data-id="{{item.id}}" catchtap="cancelBooking">取消预约</button>
+        <button wx:if="{{item.status === 'pending'}}" class="mini danger" data-id="{{item.id}}" catchtap="cancelBooking">取消</button>
       </view>
     </block>
-    <view wx:else class="empty">暂无预约记录</view>
+    <view wx:else class="empty">还没有选课</view>
   </view>
 </view>

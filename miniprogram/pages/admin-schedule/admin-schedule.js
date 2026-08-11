@@ -28,12 +28,24 @@ function decorateSchedule(item) {
 
 Page({
   data: {
+    filter: "today",
     schedules: [],
+    visibleSchedules: [],
+    stats: { today: 0, pending: 0, completed: 0, all: 0 },
     members: [],
     memberNames: [],
     campuses: [],
     coaches: [],
-    form: Object.assign({}, emptyForm)
+    form: Object.assign({}, emptyForm),
+    feedbackVisible: false,
+    feedbackScheduleId: "",
+    feedbackTags: [],
+    feedbackNote: "",
+    feedbackOptions: ["状态好", "动作进步", "需加强", "配合度高", "体能提升"].map((label) => ({ label, selected: false }))
+  },
+
+  onLoad(options) {
+    if (options && options.filter) this.setData({ filter: options.filter });
   },
 
   onShow() {
@@ -44,14 +56,35 @@ Page({
   load() {
     api.call("getHomeData").then((data) => {
       const members = data.members || [];
+      const schedules = (data.schedules || []).map(decorateSchedule).sort((a, b) => rules.sortByDateTime(a, b));
       this.setData({
-        schedules: (data.schedules || []).map(decorateSchedule).slice(0, 50),
+        schedules,
+        stats: {
+          today: schedules.filter((item) => rules.daysFromToday(item.lessonDate) === 0 && item.lessonStatus !== "cancelled").length,
+          pending: schedules.filter((item) => item.lessonStatus === "pending").length,
+          completed: schedules.filter((item) => item.lessonStatus === "completed").length,
+          all: schedules.length
+        },
         members,
         memberNames: members.map((item) => item.chineseName),
         campuses: unique(members.map((item) => item.campus)),
         coaches: unique(members.map((item) => item.coach))
-      });
+      }, () => this.applyFilter());
     });
+  },
+
+  setFilter(event) {
+    this.setData({ filter: event.currentTarget.dataset.filter || "today" }, () => this.applyFilter());
+  },
+
+  applyFilter() {
+    const visibleSchedules = (this.data.schedules || []).filter((item) => {
+      if (this.data.filter === "today") return rules.daysFromToday(item.lessonDate) === 0 && item.lessonStatus !== "cancelled";
+      if (this.data.filter === "pending") return item.lessonStatus === "pending";
+      if (this.data.filter === "completed") return item.lessonStatus === "completed";
+      return true;
+    }).slice(0, 80);
+    this.setData({ visibleSchedules });
   },
 
   input(event) { this.setData({ ["form." + event.currentTarget.dataset.field]: event.detail.value }); },
@@ -115,6 +148,7 @@ Page({
         api.syncing("正在核销");
         api.call("verifyScheduleQr", { code }).then((result) => {
           api.done(result.message || "已核销");
+          if (result.log && result.log.sourceScheduleId) this.openFeedback(result.log.sourceScheduleId);
           this.load();
         }).catch(api.fail);
       },
@@ -122,5 +156,57 @@ Page({
         api.toast("扫码已取消");
       }
     });
+  },
+
+  openFeedback(scheduleId) {
+    this.setData({
+      feedbackVisible: true,
+      feedbackScheduleId: scheduleId,
+      feedbackTags: [],
+      feedbackNote: "",
+      feedbackOptions: this.data.feedbackOptions.map((item) => Object.assign({}, item, { selected: false }))
+    });
+  },
+
+  toggleFeedbackTag(event) {
+    const tag = event.currentTarget.dataset.tag;
+    const options = this.data.feedbackOptions.map((item) => item.label === tag ? Object.assign({}, item, { selected: !item.selected }) : item);
+    this.setData({
+      feedbackOptions: options,
+      feedbackTags: options.filter((item) => item.selected).map((item) => item.label)
+    });
+  },
+
+  feedbackNoteInput(event) {
+    this.setData({ feedbackNote: event.detail.value });
+  },
+
+  hideFeedback() {
+    this.setData({
+      feedbackVisible: false,
+      feedbackScheduleId: "",
+      feedbackTags: [],
+      feedbackNote: "",
+      feedbackOptions: this.data.feedbackOptions.map((item) => Object.assign({}, item, { selected: false }))
+    });
+  },
+
+  submitFeedback() {
+    if (!this.data.feedbackTags.length && !this.data.feedbackNote) {
+      api.toast("请选择标签或填写备注");
+      return;
+    }
+    api.syncing("正在保存");
+    api.call("submitLessonFeedback", {
+      scheduleId: this.data.feedbackScheduleId,
+      tags: this.data.feedbackTags,
+      note: this.data.feedbackNote
+    }).then((result) => {
+      api.done(result.message);
+      this.hideFeedback();
+    }).catch(api.fail);
+  },
+
+  noop() {
   }
 });

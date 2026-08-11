@@ -19,9 +19,43 @@
           <text class="badge {{item.verificationStatusClass}}">{{item.verificationStatusText}}</text>
         </view>
         <button wx:if="{{item.verificationStatus === 'active'}}" class="primary qr-button" data-id="{{item.id}}" bindtap="showQr">查看二维码</button>
+        <button wx:if="{{item.lessonStatus === 'pending' && item.diff >= 0}}" class="qr-button" data-id="{{item.id}}" bindtap="requestLeave">申请请假</button>
       </view>
     </block>
     <view wx:else class="empty">暂无可展示课程</view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">成长反馈</view>
+    <block wx:if="{{lessonFeedbacks.length}}">
+      <view class="list-item" wx:for="{{lessonFeedbacks}}" wx:key="id">
+        <view class="row">
+          <view>
+            <view class="name">{{item.lessonDate}} {{item.lessonTime}}</view>
+            <view class="meta">{{item.coach}} · {{item.tagsText || '课后反馈'}}</view>
+            <view class="meta" wx:if="{{item.note}}">{{item.note}}</view>
+          </view>
+          <text class="badge">反馈</text>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty">暂无课后反馈</view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">请假补课</view>
+    <block wx:if="{{leaveRequests.length}}">
+      <view class="list-item" wx:for="{{leaveRequests}}" wx:key="id">
+        <view class="row">
+          <view>
+            <view class="name">{{item.lessonDate}} {{item.lessonTime}}</view>
+            <view class="meta">{{item.reason || '请假申请'}} · {{item.coach}}</view>
+          </view>
+          <text class="badge {{item.status === 'pending' ? 'warn' : item.status === 'rejected' ? 'danger' : ''}}">{{item.status === 'pending' ? '待审批' : item.status === 'approved' ? '已通过' : '已拒绝'}}</text>
+        </view>
+      </view>
+    </block>
+    <view wx:else class="empty">暂无请假记录</view>
   </view>
 
   <view class="card">

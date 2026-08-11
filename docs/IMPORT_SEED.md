@@ -24,6 +24,8 @@ npm run seed:export
 
 ```powershell
 cd D:\课表\ye-swim-wx-v1.0
+$env:YE_SWIM_SEED_SECRET="请替换为随机长密钥"
+$env:YE_SWIM_ENABLE_SEED_IMPORT="true"
 npm run ci:upload-function-direct -- --env=cloudbase-d6ge373q7724bcfe4
 npm run ci:seed-cloud -- --env=cloudbase-d6ge373q7724bcfe4
 ```
@@ -32,10 +34,10 @@ npm run ci:seed-cloud -- --env=cloudbase-d6ge373q7724bcfe4
 
 如果自动导入失败，也可以在微信开发者工具的云开发数据库里，按集合名称创建集合，然后手动导入对应 JSON 文件。
 
-管理员默认密码是 `1324`，教练和学员默认密码是 `1234`。账号规则：
+导入样例里的老板初始密码是 `1324`，首次登录后应立即修改。教练和学员不使用样例密码登录，而是使用老板登记的手机号完成微信手机号验证。账号规则：
 
 - 管理员：`yeats`
 - 教练：`jl001` 起
 - 学员：`xy001` 起，按学员姓名拼音排序
 
-导入完成后，先用 `yeats / 1324` 登录，再用 `jl001 / 1234` 和 `xy001 / 1234` 验证。
+导入完成后立即把云函数环境变量 `YE_SWIM_ENABLE_SEED_IMPORT` 改回 `false`，再用老板账号登录并修改初始密码，分别使用已登记的教练、学员手机号验证三角色页面。`YE_SWIM_SEED_SECRET` 不要写进仓库，也不要使用文档中的占位文字。

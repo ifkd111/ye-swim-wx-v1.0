@@ -6,6 +6,7 @@ const emptyForm = {
   account: "",
   password: "",
   fullName: "",
+  phone: "",
   campus: "绿洲",
   coachName: "",
   memberName: ""
@@ -16,6 +17,7 @@ Page({
     accounts: [],
     members: [],
     form: Object.assign({}, emptyForm),
+    formRole: "",
     formRoleText: "请先填写账号",
     roleText: {
       admin: "管理员",
@@ -53,7 +55,7 @@ Page({
     const field = event.currentTarget.dataset.field;
     const value = event.detail.value;
     this.setData({ ["form." + field]: value });
-    if (field === "account") this.setData({ formRoleText: this.roleTextFor(value) });
+    if (field === "account") this.setData({ formRole: rules.roleFromAccount(value) || "", formRoleText: this.roleTextFor(value) });
   },
 
   editAccount(event) {
@@ -66,10 +68,12 @@ Page({
         account: account.account || "",
         password: "",
         fullName: account.fullName || "",
+        phone: account.phone || "",
         campus: account.campus || "",
         coachName: account.coachName || "",
         memberName: account.memberName || ""
       },
+      formRole: account.role || rules.roleFromAccount(account.account) || "",
       formRoleText: this.roleTextFor(account.account)
     });
     wx.pageScrollTo({ scrollTop: 0, duration: 180 });
@@ -78,6 +82,7 @@ Page({
   resetForm() {
     this.setData({
       form: Object.assign({}, emptyForm),
+      formRole: "",
       formRoleText: "请先填写账号"
     });
   },
@@ -109,6 +114,24 @@ Page({
             this.load();
           })
           .catch(api.fail);
+      }
+    });
+  },
+
+  unbindWechat(event) {
+    const id = event.currentTarget.dataset.id;
+    const account = this.data.accounts.find((item) => item.id === id) || {};
+    wx.showModal({
+      title: "解除微信绑定",
+      content: "解除 " + (account.fullName || account.account || "该账号") + " 的旧微信绑定？之后需用已登记手机号重新验证登录。",
+      confirmText: "确认解除",
+      success: (modal) => {
+        if (!modal.confirm) return;
+        api.syncing("正在解除");
+        api.call("unbindAccountWechat", { id }).then((result) => {
+          api.done(result.message);
+          this.load();
+        }).catch(api.fail);
       }
     });
   }

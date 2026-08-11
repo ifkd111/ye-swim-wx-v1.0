@@ -3,6 +3,7 @@ const rules = require("./rules");
 const STORAGE_KEY = "ye-swim-wx-v1.mock-state";
 const DEFAULT_ADMIN_PASSWORD = "1324";
 const DEFAULT_MEMBER_PASSWORD = "1234";
+const DEV_TEST_PHONE = "13818793977";
 
 function defaultPasswordForRole(role) {
   return role === "admin" ? DEFAULT_ADMIN_PASSWORD : DEFAULT_MEMBER_PASSWORD;
@@ -17,6 +18,8 @@ function initialState() {
         password: DEFAULT_ADMIN_PASSWORD,
         role: "admin",
         fullName: "管理员",
+        phone: "",
+        loginMode: "password",
         openid: null,
         status: "active"
       },
@@ -28,6 +31,9 @@ function initialState() {
         fullName: "绿洲教练",
         coachName: "绿洲教练",
         campus: "绿洲",
+        phone: "13333330001",
+        loginMode: "phone",
+        bindingStatus: "pending",
         openid: null,
         status: "active"
       },
@@ -38,6 +44,9 @@ function initialState() {
         role: "student",
         fullName: "白卓可",
         memberId: "member-001",
+        phone: "13333330002",
+        loginMode: "phone",
+        bindingStatus: "pending",
         openid: null,
         status: "active"
       }
@@ -150,6 +159,11 @@ function initialState() {
     ],
     attendanceLogs: [],
     courseApplications: [],
+    leaveRequests: [],
+    makeupCredits: [],
+    lessonFeedbacks: [],
+    weeklyAvailabilityTemplates: [],
+    weeklyAvailabilityTemplateConfigured: false,
     auditLogs: []
   };
 }
@@ -174,7 +188,14 @@ function migrateState(state) {
     if ((account.role === "coach" || account.role === "student") && account.password === "1324") {
       account.password = DEFAULT_MEMBER_PASSWORD;
     }
+    if (!account.loginMode) account.loginMode = account.role === "admin" ? "password" : "phone";
+    if (account.role !== "admin" && !account.bindingStatus) account.bindingStatus = account.openid ? "bound" : "pending";
   });
+  state.leaveRequests = state.leaveRequests || [];
+  state.makeupCredits = state.makeupCredits || [];
+  state.lessonFeedbacks = state.lessonFeedbacks || [];
+  state.weeklyAvailabilityTemplates = state.weeklyAvailabilityTemplates || [];
+  if (state.weeklyAvailabilityTemplateConfigured === undefined) state.weeklyAvailabilityTemplateConfigured = false;
   return state;
 }
 
@@ -307,11 +328,9 @@ function availabilityFor(state, viewer) {
       if (viewer.role === "admin") return true;
       if (viewer.role === "coach") return slot.coach === viewer.coachName;
       if (viewer.role === "student") {
-        const member = state.members.find((item) => item.id === viewer.memberId);
         return (
           slot.status === "published" &&
-          rules.isBookableForStudent(slot.slotDate) &&
-          (!member || !member.coach || member.coach === slot.coach)
+          rules.isBookableSlot(slot.slotDate, slot.slotTime)
         );
       }
       return false;
@@ -341,11 +360,44 @@ function dashboardInsights(state, viewer) {
     overdueCheckins,
     pendingBookings: bookings.filter((item) => item.status === "pending"),
     pendingApplications: applications.filter((item) => item.status === "pending"),
+    pendingLeaves: state.leaveRequests.filter((item) => viewer.role === "admin" && item.status === "pending"),
+    pendingMakeups: state.makeupCredits.filter((item) => viewer.role === "admin" && item.status === "available"),
     nextSchedule: nextScheduleFor(state, viewer)
   };
 }
 
+function performanceDashboard(state, days) {
+  const windowDays = Number(days || 7);
+  const inWindow = (value) => {
+    const diff = rules.daysFromToday(value);
+    return diff <= 0 && diff > -windowDays;
+  };
+  const completed = state.schedules.filter((item) => item.lessonStatus === "completed" && inWindow(item.lessonDate));
+  const logs = state.attendanceLogs.filter((item) => inWindow(item.attendanceDate));
+  const byCoach = {};
+  completed.forEach((item) => {
+    const key = item.coach || "未分配";
+    byCoach[key] = byCoach[key] || { coach: key, completed: 0, deducted: 0 };
+    byCoach[key].completed += 1;
+  });
+  logs.forEach((item) => {
+    const key = item.coach || "未分配";
+    byCoach[key] = byCoach[key] || { coach: key, completed: 0, deducted: 0 };
+    byCoach[key].deducted += Number(item.lessonsDeducted || 0);
+  });
+  return {
+    days: windowDays,
+    completedLessons: completed.length,
+    deductedLessons: logs.reduce((sum, item) => sum + Number(item.lessonsDeducted || 0), 0),
+    pendingApplications: state.courseApplications.filter((item) => item.status === "pending").length,
+    pendingLeaves: state.leaveRequests.filter((item) => item.status === "pending").length,
+    pendingMakeups: state.makeupCredits.filter((item) => item.status === "available").length,
+    coachRanking: Object.keys(byCoach).map((key) => byCoach[key]).sort((a, b) => b.completed - a.completed || b.deducted - a.deducted).slice(0, 8)
+  };
+}
+
 function homeData(state, viewer) {
+  const memberIds = memberViews(state, viewer).map((item) => item.id);
   return {
     viewer: safeAccount(viewer),
     members: memberViews(state, viewer),
@@ -363,15 +415,71 @@ function homeData(state, viewer) {
       if (viewer.role === "student") return item.memberId === viewer.memberId;
       return false;
     }),
+    leaveRequests: state.leaveRequests.filter((item) => {
+      if (viewer.role === "admin") return true;
+      if (viewer.role === "coach") return item.coach === viewer.coachName;
+      if (viewer.role === "student") return item.memberId === viewer.memberId;
+      return false;
+    }),
+    makeupCredits: state.makeupCredits.filter((item) => {
+      if (viewer.role === "admin") return true;
+      if (viewer.role === "coach") return item.coach === viewer.coachName;
+      if (viewer.role === "student") return item.memberId === viewer.memberId;
+      return false;
+    }),
+    lessonFeedbacks: state.lessonFeedbacks.filter((item) => {
+      if (viewer.role === "admin") return true;
+      if (viewer.role === "coach") return item.coach === viewer.coachName;
+      if (viewer.role === "student") return memberIds.indexOf(item.memberId) >= 0;
+      return false;
+    }),
     courseProducts: state.courseProducts,
-    dashboard: dashboardInsights(state, viewer),
+    dashboard: viewer.role === "admin" ? performanceDashboard(state, 7) : dashboardInsights(state, viewer),
+    dashboard30: viewer.role === "admin" ? performanceDashboard(state, 30) : {},
+    weeklyAvailabilityTemplate: viewer.role === "admin" ? {
+      configured: Boolean(state.weeklyAvailabilityTemplateConfigured),
+      rows: clone(state.weeklyAvailabilityTemplates)
+    } : { configured: false, rows: [] },
     accounts: viewer.role === "admin" ? state.accounts.map(safeAccount) : []
   };
 }
 
+function listPagedData(state, viewer, payload) {
+  const collection = String(payload.collection || "").trim();
+  const allowed = ["members", "schedules", "attendanceLogs", "bookingRequests", "lessonFeedbacks"];
+  if (allowed.indexOf(collection) === -1) throw new Error("不支持分页读取该集合");
+  const page = Math.max(1, Number(payload.page || 1));
+  const pageSize = Math.min(80, Math.max(1, Number(payload.pageSize || 30)));
+  let items = [];
+  if (collection === "members") items = memberViews(state, viewer);
+  if (collection === "schedules") items = schedulesFor(state, viewer);
+  if (collection === "attendanceLogs") {
+    items = state.attendanceLogs.filter((log) => {
+      if (viewer.role === "admin") return true;
+      if (viewer.role === "coach") return log.coach === viewer.coachName;
+      if (viewer.role === "student") return log.memberId === viewer.memberId;
+      return false;
+    });
+  }
+  if (collection === "bookingRequests") items = bookingsFor(state, viewer);
+  if (collection === "lessonFeedbacks") {
+    const memberIds = memberViews(state, viewer).map((item) => item.id);
+    items = state.lessonFeedbacks.filter((item) => {
+      if (viewer.role === "admin") return true;
+      if (viewer.role === "coach") return item.coach === viewer.coachName;
+      if (viewer.role === "student") return memberIds.indexOf(item.memberId) >= 0;
+      return false;
+    });
+  }
+  const offset = (page - 1) * pageSize;
+  return { collection, page, pageSize, total: items.length, items: clone(items.slice(offset, offset + pageSize)) };
+}
+
 function safeAccount(account) {
   const result = clone(account);
+  result.wechatBound = Boolean(result.openid);
   delete result.password;
+  delete result.openid;
   return result;
 }
 
@@ -476,6 +584,11 @@ function saveAccount(state, viewer, payload) {
   const id = String(raw.id || "").trim();
   const duplicate = state.accounts.find((item) => item.account === accountName && item.id !== id);
   if (duplicate) throw new Error("账号已存在");
+  const phone = rules.normalizePhone(raw.phone || "");
+  if (phone && !rules.isChinaMobile(phone)) throw new Error("手机号必须是 11 位大陆手机号");
+  if (role !== "admin" && !phone) throw new Error("教练和学员账号需要绑定手机号");
+  const duplicatePhone = phone && state.accounts.find((item) => item.phone === phone && item.id !== id);
+  if (duplicatePhone) throw new Error("手机号已绑定其他账号");
 
   const current = id ? state.accounts.find((item) => item.id === id) : null;
   if (current && current.account !== accountName) {
@@ -489,6 +602,7 @@ function saveAccount(state, viewer, payload) {
     memberId = member.id;
   }
 
+  const phoneChanged = Boolean(current && role !== "admin" && phone !== String(current.phone || ""));
   const next = Object.assign({}, current || {}, {
     account: accountName,
     role,
@@ -496,11 +610,15 @@ function saveAccount(state, viewer, payload) {
     campus: String(raw.campus || current && current.campus || "").trim(),
     coachName: role === "coach" ? String(raw.coachName || raw.fullName || "").trim() : "",
     memberId: role === "student" ? memberId : "",
+    phone,
+    loginMode: role === "admin" ? "password" : "phone",
+    bindingStatus: current && current.openid && !phoneChanged ? "bound" : phone ? "pending" : "",
     status: raw.status || current && current.status || "active",
     updatedAt: new Date().toISOString()
   });
+  if (phoneChanged) next.openid = null;
 
-  if (!current || raw.password) {
+  if (role === "admin" && (!current || raw.password)) {
     next.password = String(raw.password || defaultPasswordForRole(role));
   }
   if (role === "coach" && !next.coachName) throw new Error("教练账号需要填写教练名");
@@ -522,12 +640,14 @@ function resetAccountPassword(state, viewer, payload) {
   const accountName = rules.normalizeAccount(payload.account);
   const account = state.accounts.find((item) => item.id === id || item.account === accountName);
   if (!account) throw new Error("账号不存在");
+  if (account.role !== "admin") throw new Error("教练和学员使用手机号验证，无需重置密码");
   account.password = defaultPasswordForRole(account.role);
   account.updatedAt = new Date().toISOString();
   return { message: "密码已重置为系统默认密码", account: safeAccount(account) };
 }
 
 function changeMyPassword(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
   const oldPassword = String(payload.oldPassword || "");
   const newPassword = String(payload.newPassword || "");
   if (!newPassword || newPassword.length < 4) throw new Error("新密码至少 4 位");
@@ -538,31 +658,114 @@ function changeMyPassword(state, viewer, payload) {
   return { message: "密码已修改，请使用新密码登录" };
 }
 
+function saveWeeklyAvailabilityTemplate(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const rows = Array.isArray(payload.rows || payload.templates) ? payload.rows || payload.templates : [];
+  if (rows.length > 100) throw new Error("每周模板最多 100 条");
+  state.weeklyAvailabilityTemplates = clone(rows);
+  state.weeklyAvailabilityTemplateConfigured = true;
+  return { message: "每周模板已同步", rows: clone(rows) };
+}
+
+function unbindAccountWechat(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const account = state.accounts.find((item) => item.id === (payload.id || payload.accountId));
+  if (!account) throw new Error("账号不存在");
+  if (account.role === "admin") throw new Error("老板账号不能在小程序内解除绑定");
+  account.openid = null;
+  account.bindingStatus = account.phone ? "pending" : "";
+  account.updatedAt = new Date().toISOString();
+  return { message: "已解除旧微信绑定，可用已登记手机号重新登录" };
+}
+
 function login(payload) {
   const state = loadState();
-  const accountName = rules.normalizeAccount(payload.account);
-  const account = activeAccount(state, accountName);
-  if (!account || account.password !== String(payload.password || "")) {
+  const loginId = String(payload.account || "").trim();
+  const accountName = rules.normalizeAccount(loginId);
+  const isPhoneLoginId = rules.isChinaMobile(loginId);
+  const account = isPhoneLoginId
+    ? state.accounts.find((item) => item.phone === rules.normalizePhone(loginId) && item.status !== "disabled")
+    : activeAccount(state, accountName);
+  let resolvedAccount = account;
+  let adminPhoneToBind = "";
+  if (!resolvedAccount && isPhoneLoginId) {
+    const admin = activeAccount(state, "yeats");
+    if (admin && admin.password === String(payload.password || "") && (!admin.phone || admin.phone === rules.normalizePhone(loginId))) {
+      adminPhoneToBind = rules.normalizePhone(loginId);
+      resolvedAccount = admin;
+    }
+  }
+  if (!resolvedAccount || resolvedAccount.password !== String(payload.password || "")) {
     throw new Error("账号或密码错误");
   }
+  if (resolvedAccount.role !== "admin") throw new Error("教练和学员请使用手机号验证登录");
 
-  const role = rules.roleFromAccount(accountName);
-  if (!role || role !== account.role) {
+  const role = isPhoneLoginId ? resolvedAccount.role : rules.roleFromAccount(accountName);
+  if (!role || role !== resolvedAccount.role) {
     throw new Error("账号角色配置不正确");
   }
 
   const openid = payload.openid || "mock-openid";
-  if (account.openid && account.openid !== openid && account.role !== "admin") {
-    throw new Error("该账号已经绑定其他微信");
+  if (resolvedAccount.openid && resolvedAccount.openid !== openid) {
+    throw new Error("老板账号已绑定其他微信，请使用原微信登录或由运维临时开启换绑");
   }
 
-  account.openid = openid;
-  account.lastLoginAt = new Date().toISOString();
+  if (adminPhoneToBind) {
+    resolvedAccount.phone = adminPhoneToBind;
+    resolvedAccount.loginMode = "password";
+  }
+  resolvedAccount.openid = openid;
+  resolvedAccount.lastLoginAt = new Date().toISOString();
   saveState(state);
 
   return {
-    session: safeAccount(account),
+    session: safeAccount(resolvedAccount),
     message: "登录成功，已绑定当前微信"
+  };
+}
+
+function loginByPhone(payload) {
+  const state = loadState();
+  const phone = rules.normalizePhone(payload.phone);
+  if (!rules.isChinaMobile(phone)) throw new Error("请输入正确的 11 位手机号");
+  const matches = state.accounts.filter((item) => item.phone === phone && item.status !== "disabled");
+  if (matches.length > 1) throw new Error("该手机号绑定了多个账号，请联系老板处理");
+  const account = matches[0];
+  if (!account) throw new Error("该手机号未开通账号，请联系老板绑定");
+  if (account.role === "admin") throw new Error("老板账号请使用账号密码登录");
+
+  const openid = payload.openid || "mock-phone-openid";
+  if (account.openid && account.openid !== openid) {
+    throw new Error("该手机号账号已经绑定其他微信");
+  }
+  account.openid = openid;
+  account.phoneVerifiedAt = new Date().toISOString();
+  account.bindingStatus = "bound";
+  account.loginMode = "phone";
+  account.lastLoginAt = new Date().toISOString();
+  account.updatedAt = new Date().toISOString();
+  saveState(state);
+  return {
+    session: safeAccount(account),
+    message: "手机号验证成功，已绑定当前微信"
+  };
+}
+
+function loginForTest(payload) {
+  const phone = rules.normalizePhone(payload.phone);
+  if (phone !== DEV_TEST_PHONE) throw new Error("测试手机号不正确");
+  const role = String(payload.role || "").trim();
+  const accountName = role === "admin" ? "yeats" : role === "coach" ? "jl001" : role === "student" ? "xy001" : "";
+  if (!accountName) throw new Error("请选择测试角色");
+  const state = loadState();
+  const account = activeAccount(state, accountName);
+  if (!account) throw new Error("测试账号不存在，请先初始化数据");
+  return {
+    session: Object.assign(safeAccount(account), {
+      testLogin: true,
+      testPhone: phone
+    }),
+    message: "测试登录成功"
   };
 }
 
@@ -570,11 +773,10 @@ function createBookingRequest(state, viewer, payload) {
   assertRole(viewer, ["student"]);
   const slot = state.availabilitySlots.find((item) => item.id === payload.slotId);
   if (!slot || slot.status !== "published") throw new Error("该时间暂不可预约");
-  if (!rules.isBookableForStudent(slot.slotDate)) throw new Error("该时间不符合提前预约规则");
+  if (!rules.isBookableSlot(slot.slotDate, slot.slotTime)) throw new Error("该时间已经不可预约");
 
   const member = state.members.find((item) => item.id === viewer.memberId);
   if (!member) throw new Error("找不到绑定学员");
-  if (member.coach && member.coach !== slot.coach) throw new Error("该时间不属于你的绑定教练");
 
   const activeCount = state.bookingRequests.filter((item) => item.slotId === slot.id && ["pending", "approved"].indexOf(item.status) >= 0).length;
   if (activeCount >= Number(slot.capacity || 1)) throw new Error("该时间名额已满");
@@ -591,13 +793,15 @@ function createBookingRequest(state, viewer, payload) {
     slotTime: slot.slotTime,
     campus: slot.campus,
     coach: slot.coach,
+    productId: String(payload.productId || member.productId || "").trim(),
+    productName: String(payload.productName || member.productName || "").trim(),
     status: "pending",
     note: String(payload.note || "").trim(),
     createdAt: new Date().toISOString()
   };
   state.bookingRequests.push(request);
   state.auditLogs.push({ id: newId("audit"), action: "createBookingRequest", account: viewer.account, createdAt: request.createdAt });
-  return { message: "预约申请已提交，等待管理员审批", request };
+  return { message: "已生成课程草稿，等待老板发布", request };
 }
 
 function approveBookingRequest(state, viewer, payload) {
@@ -620,9 +824,12 @@ function approveBookingRequest(state, viewer, payload) {
     coach: slot.coach,
     memberId: request.memberId,
     memberName: request.memberName,
+    productId: request.productId || "",
+    productName: request.productName || "",
     attended: false,
     lessonStatus: "pending",
-    source: "student_booking"
+    source: "student_booking",
+    bookingRequestId: request.id
   };
   Object.assign(schedule, verificationPatch(schedule));
   state.schedules.push(schedule);
@@ -630,6 +837,26 @@ function approveBookingRequest(state, viewer, payload) {
   request.reviewedAt = new Date().toISOString();
   request.createdScheduleId = schedule.id;
   return { message: "已通过预约并生成排课", schedule };
+}
+
+function updateBookingRequestMatch(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const request = state.bookingRequests.find((item) => item.id === payload.requestId);
+  if (!request || request.status !== "pending") throw new Error("该课程草稿无法调整");
+  const slot = state.availabilitySlots.find((item) => item.id === payload.slotId);
+  if (!slot || slot.status !== "published") throw new Error("所选时间暂未开放");
+  const otherActive = state.bookingRequests.filter((item) => item.id !== request.id && item.slotId === slot.id && ["pending", "approved"].indexOf(item.status) >= 0);
+  if (otherActive.length >= Number(slot.capacity || 1)) throw new Error("所选时间名额已满");
+  Object.assign(request, {
+    slotId: slot.id,
+    slotDate: slot.slotDate,
+    slotTime: slot.slotTime,
+    campus: slot.campus,
+    coach: slot.coach,
+    matchedBy: viewer.account,
+    updatedAt: new Date().toISOString()
+  });
+  return { message: "课程草稿已调整", request };
 }
 
 function rejectBookingRequest(state, viewer, payload) {
@@ -663,10 +890,12 @@ function cancelBookingRequest(state, viewer, payload) {
 function completeScheduleAttendance(state, viewer, schedule, sourceNote, verificationCode) {
   assertRole(viewer, ["admin", "coach"]);
   if (viewer.role === "coach" && schedule.coach !== viewer.coachName) throw new Error("只能确认自己的课程");
+  if (viewer.role === "coach" && rules.daysFromToday(schedule.lessonDate) > 0) throw new Error("课程还未开始，暂不能确认出勤");
 
   if (schedule.lessonStatus === "completed") {
     return { message: "该课程已经确认过出勤", schedule };
   }
+  if (schedule.lessonStatus === "leave_approved") throw new Error("该课程已请假，不可确认出勤");
 
   const member = state.members.find((item) => item.id === schedule.memberId);
   if (!member) throw new Error("学员不存在");
@@ -714,6 +943,136 @@ function verifyScheduleQr(state, viewer, payload) {
   return completeScheduleAttendance(state, viewer, schedule, "扫码核销", code);
 }
 
+function submitLessonFeedback(state, viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const schedule = state.schedules.find((item) => item.id === payload.scheduleId);
+  if (!schedule) throw new Error("排课不存在");
+  if (viewer.role === "coach" && schedule.coach !== viewer.coachName) throw new Error("只能反馈自己的课程");
+  if (schedule.lessonStatus !== "completed") throw new Error("完成出勤后才能填写课后反馈");
+  const member = state.members.find((item) => item.id === schedule.memberId);
+  if (!member) throw new Error("学员不存在");
+  const feedback = {
+    id: "",
+    scheduleId: schedule.id,
+    memberId: member.id,
+    memberName: member.chineseName,
+    coach: schedule.coach,
+    campus: schedule.campus,
+    lessonDate: schedule.lessonDate,
+    lessonTime: schedule.lessonTime,
+    tags: Array.isArray(payload.tags) ? payload.tags.map((item) => String(item).trim()).filter(Boolean).slice(0, 6) : [],
+    note: String(payload.note || "").trim(),
+    createdBy: viewer.account,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  };
+  if (!feedback.tags.length && !feedback.note) throw new Error("请选择标签或填写反馈备注");
+  const current = state.lessonFeedbacks.find((item) => item.scheduleId === schedule.id);
+  if (current) {
+    Object.assign(current, feedback, { id: current.id });
+    return { message: "课后反馈已更新", feedback: current };
+  }
+  feedback.id = newId("feedback");
+  state.lessonFeedbacks.push(feedback);
+  return { message: "课后反馈已保存", feedback };
+}
+
+function createLeaveRequest(state, viewer, payload) {
+  assertRole(viewer, ["student"]);
+  const schedule = state.schedules.find((item) => item.id === payload.scheduleId);
+  if (!schedule) throw new Error("排课不存在");
+  if (schedule.memberId !== viewer.memberId) throw new Error("只能为自己的课程请假");
+  if (schedule.lessonStatus !== "pending") throw new Error("该课程当前不能请假");
+  if (rules.daysFromToday(schedule.lessonDate) < 0) throw new Error("已过期课程不能请假");
+  if (state.leaveRequests.some((item) => item.scheduleId === schedule.id && item.status === "pending")) {
+    throw new Error("该课程已有待审批请假申请");
+  }
+  const request = {
+    id: newId("leave"),
+    scheduleId: schedule.id,
+    memberId: schedule.memberId,
+    memberName: schedule.memberName,
+    coach: schedule.coach,
+    campus: schedule.campus,
+    lessonDate: schedule.lessonDate,
+    lessonTime: schedule.lessonTime,
+    reason: String(payload.reason || "").trim(),
+    status: "pending",
+    createdAt: new Date().toISOString()
+  };
+  state.leaveRequests.push(request);
+  return { message: "请假申请已提交，等待老板审批", request };
+}
+
+function approveLeaveRequest(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const request = state.leaveRequests.find((item) => item.id === payload.requestId);
+  if (!request || request.status !== "pending") throw new Error("该请假申请无法处理");
+  const schedule = state.schedules.find((item) => item.id === request.scheduleId);
+  if (!schedule) throw new Error("排课不存在");
+  const credit = {
+    id: newId("makeup"),
+    leaveRequestId: request.id,
+    sourceScheduleId: schedule.id,
+    memberId: request.memberId,
+    memberName: request.memberName,
+    coach: request.coach,
+    campus: request.campus,
+    status: "available",
+    reason: request.reason || "",
+    createdAt: new Date().toISOString()
+  };
+  state.makeupCredits.push(credit);
+  request.status = "approved";
+  request.reviewedAt = new Date().toISOString();
+  request.reviewedBy = viewer.account;
+  request.makeupCreditId = credit.id;
+  schedule.lessonStatus = "leave_approved";
+  schedule.leaveRequestId = request.id;
+  return { message: "已通过请假并生成补课额度", credit };
+}
+
+function rejectLeaveRequest(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const request = state.leaveRequests.find((item) => item.id === payload.requestId);
+  if (!request || request.status !== "pending") throw new Error("该请假申请无法处理");
+  request.status = "rejected";
+  request.rejectReason = String(payload.reason || "").trim();
+  request.reviewedAt = new Date().toISOString();
+  request.reviewedBy = viewer.account;
+  return { message: "已拒绝请假申请", request };
+}
+
+function createMakeupSchedule(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const credit = state.makeupCredits.find((item) => item.id === payload.creditId);
+  if (!credit || credit.status !== "available") throw new Error("补课额度不可用");
+  const member = state.members.find((item) => item.id === credit.memberId);
+  if (!member) throw new Error("学员不存在");
+  const schedule = {
+    id: newId("schedule"),
+    lessonDate: String(payload.lessonDate || "").trim(),
+    lessonTime: String(payload.lessonTime || "").trim(),
+    campus: String(payload.campus || credit.campus || member.campus || "").trim(),
+    coach: String(payload.coach || credit.coach || member.coach || "").trim(),
+    memberId: member.id,
+    memberName: member.chineseName,
+    attended: false,
+    lessonStatus: "pending",
+    source: "makeup_credit",
+    makeupCreditId: credit.id
+  };
+  if (!schedule.lessonDate || !schedule.lessonTime || !schedule.campus || !schedule.coach) {
+    throw new Error("日期、时间、校区、教练不能为空");
+  }
+  Object.assign(schedule, verificationPatch(schedule));
+  state.schedules.push(schedule);
+  credit.status = "scheduled";
+  credit.makeupScheduleId = schedule.id;
+  credit.scheduledAt = new Date().toISOString();
+  return { message: "补课排课已创建", schedule };
+}
+
 function createAvailabilitySlot(state, viewer, payload) {
   assertRole(viewer, ["admin", "coach"]);
   const slot = {
@@ -730,6 +1089,14 @@ function createAvailabilitySlot(state, viewer, payload) {
   if (!slot.slotDate || !slot.slotTime || !slot.campus || !slot.coach) {
     throw new Error("日期、时间、校区、教练不能为空");
   }
+  const duplicate = state.availabilitySlots.find((item) =>
+    item.slotDate === slot.slotDate &&
+    item.slotTime === slot.slotTime &&
+    item.campus === slot.campus &&
+    item.coach === slot.coach &&
+    ["draft", "published"].indexOf(item.status) >= 0
+  );
+  if (duplicate) return { message: "该教练同一时间已存在，无需重复发布", slot: duplicate, skipped: true };
   state.availabilitySlots.push(slot);
   return { message: viewer.role === "admin" ? "可预约时间已发布" : "空余时间已提交，等待管理员发布", slot };
 }
@@ -738,12 +1105,16 @@ function createAvailabilitySlots(state, viewer, payload) {
   assertRole(viewer, ["admin", "coach"]);
   const rows = Array.isArray(payload.slots) ? payload.slots : [];
   const created = [];
+  let skipped = 0;
   rows.forEach((row) => {
     const result = createAvailabilitySlot(state, viewer, row);
-    created.push(result.slot);
+    if (result.skipped) skipped += 1;
+    else created.push(result.slot);
   });
-  if (!created.length) throw new Error("没有可提交的空余时间");
-  return { message: "已提交 " + created.length + " 个空余时间", slots: created };
+  if (!created.length && !skipped) throw new Error("没有可提交的空余时间");
+  const actionText = viewer.role === "admin" ? "发布" : "提交";
+  const skippedText = skipped ? "，跳过 " + skipped + " 个重复时间" : "";
+  return { message: "已" + actionText + " " + created.length + " 个时间" + skippedText, slots: created, skipped };
 }
 
 function publishAvailabilitySlot(state, viewer, payload) {
@@ -753,6 +1124,17 @@ function publishAvailabilitySlot(state, viewer, payload) {
   slot.status = "published";
   slot.publishOrder = Number(payload.publishOrder || slot.publishOrder || 100);
   return { message: "已发布可预约时间", slot };
+}
+
+function closeAvailabilitySlot(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const slot = state.availabilitySlots.find((item) => item.id === payload.slotId);
+  if (!slot) throw new Error("可预约时间不存在");
+  if (slot.status === "closed") return { message: "该时间已经关闭", slot };
+  slot.status = "closed";
+  slot.closedAt = new Date().toISOString();
+  slot.closedBy = viewer.account;
+  return { message: "已停止继续预约，已有学员课程不受影响", slot };
 }
 
 function createManualSchedule(state, viewer, payload) {
@@ -797,6 +1179,9 @@ function createCourseApplication(state, viewer, payload) {
   const member = state.members.find((item) => item.id === viewer.memberId);
   const product = state.courseProducts.find((item) => item.id === payload.productId) || state.courseProducts[0];
   if (!member || !product) throw new Error("申请信息不完整");
+  if (state.courseApplications.some((item) => item.memberId === member.id && item.status === "pending")) {
+    throw new Error("已有续课申请等待老板处理，请勿重复提交");
+  }
   const application = {
     id: newId("course-app"),
     memberId: member.id,
@@ -844,6 +1229,8 @@ function call(action, payload) {
   const state = loadState();
 
   if (action === "login") return login(payload || {});
+  if (action === "loginByPhone") return loginByPhone(payload || {});
+  if (action === "loginForTest") return loginForTest(payload || {});
   if (action === "resetMock") {
     const fresh = initialState();
     saveState(fresh);
@@ -855,23 +1242,33 @@ function call(action, payload) {
 
   let result;
   if (action === "getHomeData") result = homeData(state, viewer);
+  else if (action === "listPagedData") result = listPagedData(state, viewer, payload);
   else if (action === "saveMember") result = saveMember(state, viewer, payload);
   else if (action === "bulkImportMembers") result = bulkImportMembers(state, viewer, payload);
   else if (action === "saveAccount") result = saveAccount(state, viewer, payload);
   else if (action === "resetAccountPassword") result = resetAccountPassword(state, viewer, payload);
   else if (action === "changeMyPassword") result = changeMyPassword(state, viewer, payload);
+  else if (action === "unbindAccountWechat") result = unbindAccountWechat(state, viewer, payload);
+  else if (action === "saveWeeklyAvailabilityTemplate") result = saveWeeklyAvailabilityTemplate(state, viewer, payload);
   else if (action === "createBookingRequest") result = createBookingRequest(state, viewer, payload);
+  else if (action === "updateBookingRequestMatch") result = updateBookingRequestMatch(state, viewer, payload);
   else if (action === "approveBookingRequest") result = approveBookingRequest(state, viewer, payload);
   else if (action === "rejectBookingRequest") result = rejectBookingRequest(state, viewer, payload);
   else if (action === "cancelBookingRequest") result = cancelBookingRequest(state, viewer, payload);
   else if (action === "markAttendance") result = markAttendance(state, viewer, payload);
   else if (action === "verifyScheduleQr") result = verifyScheduleQr(state, viewer, payload);
+  else if (action === "submitLessonFeedback") result = submitLessonFeedback(state, viewer, payload);
+  else if (action === "createLeaveRequest") result = createLeaveRequest(state, viewer, payload);
+  else if (action === "approveLeaveRequest") result = approveLeaveRequest(state, viewer, payload);
+  else if (action === "rejectLeaveRequest") result = rejectLeaveRequest(state, viewer, payload);
+  else if (action === "createMakeupSchedule") result = createMakeupSchedule(state, viewer, payload);
   else if (action === "cancelSchedule") result = cancelSchedule(state, viewer, payload);
   else if (action === "approveCourseApplication") result = approveCourseApplication(state, viewer, payload);
   else if (action === "rejectCourseApplication") result = rejectCourseApplication(state, viewer, payload);
   else if (action === "createAvailabilitySlot") result = createAvailabilitySlot(state, viewer, payload);
   else if (action === "createAvailabilitySlots") result = createAvailabilitySlots(state, viewer, payload);
   else if (action === "publishAvailabilitySlot") result = publishAvailabilitySlot(state, viewer, payload);
+  else if (action === "closeAvailabilitySlot") result = closeAvailabilitySlot(state, viewer, payload);
   else if (action === "createManualSchedule") result = createManualSchedule(state, viewer, payload);
   else if (action === "createCourseApplication") result = createCourseApplication(state, viewer, payload);
   else throw new Error("未知操作：" + action);

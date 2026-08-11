@@ -7,17 +7,41 @@
       </view>
     </view>
     <view class="title">叶</view>
-    <view class="subtitle">输入账号和密码即可进入对应工作台。</view>
+    <view class="subtitle">教练和学员用手机号验证进入，老板可用账号密码管理。</view>
 
-    <view class="field">
-      <text class="field-label">账号</text>
-      <input value="{{account}}" placeholder="请输入管理员、教练或学员账号" bindinput="onAccountInput" />
-    </view>
-    <view class="field">
-      <text class="field-label">密码</text>
-      <input password value="{{password}}" placeholder="请输入密码" bindinput="onPasswordInput" />
+    <view class="login-tabs">
+      <view class="chip {{mode === 'phone' ? 'active' : ''}}" bindtap="setMode" data-mode="phone">手机号登录</view>
+      <view class="chip {{mode === 'password' ? 'active' : ''}}" bindtap="setMode" data-mode="password">老板登录</view>
     </view>
 
-    <button class="primary login-button" loading="{{loading}}" bindtap="login">登录并绑定微信</button>
+    <view wx:if="{{mode === 'phone'}}">
+      <view class="field" wx:if="{{useMock || testLogin.enabled}}">
+        <text class="field-label">测试手机号</text>
+        <input value="{{phone}}" type="number" maxlength="11" placeholder="输入测试手机号" bindinput="onPhoneInput" />
+      </view>
+      <view class="test-panel" wx:if="{{testLogin.enabled}}">
+        <view class="login-tip">仅微信开发者工具可用 · {{phone}} · 选择角色直接体验</view>
+        <view class="role-grid">
+          <button class="primary mini" loading="{{loading}}" data-role="admin" bindtap="testLogin">老板</button>
+          <button class="mini" loading="{{loading}}" data-role="coach" bindtap="testLogin">教练</button>
+          <button class="mini" loading="{{loading}}" data-role="student" bindtap="testLogin">学员</button>
+        </view>
+      </view>
+      <button wx:if="{{useMock && !testLogin.enabled}}" class="primary login-button" loading="{{loading}}" bindtap="phoneLogin">手机号验证登录</button>
+      <button wx:if="{{!useMock}}" class="login-button" loading="{{loading}}" open-type="getPhoneNumber" bindgetphonenumber="phoneLogin">微信手机号验证</button>
+      <view class="login-tip" wx:if="{{!testLogin.enabled}}">手机号需先由老板在账号页绑定。</view>
+    </view>
+
+    <view wx:else>
+      <view class="field">
+        <text class="field-label">账号或手机号</text>
+        <input value="{{account}}" placeholder="请输入老板账号或老板手机号" bindinput="onAccountInput" />
+      </view>
+      <view class="field">
+        <text class="field-label">密码</text>
+        <input password value="{{password}}" placeholder="请输入密码" bindinput="onPasswordInput" />
+      </view>
+      <button class="primary login-button" loading="{{loading}}" bindtap="login">登录并绑定微信</button>
+    </view>
   </view>
 </view>

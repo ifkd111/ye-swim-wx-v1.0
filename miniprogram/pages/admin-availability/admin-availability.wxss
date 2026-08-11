@@ -1,3 +1,82 @@
 .card button {
   width: 100%;
 }
+
+.card .compact-button {
+  width: auto;
+  min-width: 112rpx;
+}
+
+.card .inline-toolbar {
+  margin-top: 0;
+  flex-wrap: nowrap;
+}
+
+.card .inline-toolbar button {
+  width: 108rpx;
+  min-width: 108rpx;
+}
+
+.card-head .card-title {
+  margin-bottom: 0;
+}
+
+.capacity-row {
+  margin-top: 20rpx;
+}
+
+.template-actions button {
+  flex: 1;
+  min-width: 230rpx;
+}
+
+.compact-empty {
+  padding: 24rpx 12rpx;
+}
+
+.preview-card {
+  border-color: #8fc2ff;
+}
+
+.section-tip {
+  margin: -4rpx 0 20rpx;
+}
+
+.close-button {
+  margin-top: 14rpx;
+}
+
+.option-board {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10rpx;
+}
+
+.weekday-board {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.time-board {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.option-block {
+  min-height: 72rpx;
+  padding: 14rpx 10rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx solid #e0e6e2;
+  border-radius: 15rpx;
+  background: #f8faf8;
+  color: #50615a;
+  font-size: 22rpx;
+  font-weight: 700;
+  text-align: center;
+}
+
+.option-block.active {
+  border-color: #176f63;
+  background: #e9f5f1;
+  color: #176f63;
+}

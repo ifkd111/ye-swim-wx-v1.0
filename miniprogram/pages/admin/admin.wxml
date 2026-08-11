@@ -1,77 +1,76 @@
-<view class="page">
-  <view class="topbar">
-    <view>
-      <view class="title">老板工作台</view>
-      <view class="subtitle">今天先处理审批、续课、低课时和现场课程</view>
-    </view>
-    <view class="top-actions">
-      <button class="mini" bindtap="changePassword">改密码</button>
-      <button bindtap="logout">退出</button>
-    </view>
+<view class="page admin-page">
+  <view class="app-header">
+    <view><view class="eyebrow">老板工作台</view><view class="title">今天要处理的</view></view>
+    <view class="header-action" bindtap="go" data-url="/pages/admin-coaches/admin-coaches">教练 {{coachCount}}</view>
   </view>
 
-  <view class="card hero-card">
-    <view class="card-title">今日待办</view>
-    <view class="nav-list">
-      <view class="nav-card tappable" wx:for="{{todoCards}}" wx:key="title" bindtap="go" data-url="{{item.url}}">
-        <text class="metric-value {{item.level === 'danger' ? 'text-danger' : item.level === 'warn' ? 'text-warn' : ''}}">{{item.value}}</text>
-        <text class="nav-title">{{item.title}}</text>
-        <text class="nav-meta">{{item.desc}}</text>
+  <view class="date-strip">
+    <view class="date-block {{selectedDate === item.value ? 'active' : ''}}" wx:for="{{dateTabs}}" wx:key="value" bindtap="selectDate" data-date="{{item.value}}"><text>{{item.label}}</text><text class="date-strong">{{item.day}}</text></view>
+  </view>
+
+  <view class="supply-summary">
+    <view><text class="summary-number">{{coachSupply.length}}</text><text class="summary-label">教练有空</text></view>
+    <view class="summary-arrow">→</view>
+    <view><text class="summary-number">{{demandMembers.length}}</text><text class="summary-label">学员想上课</text></view>
+    <view class="summary-arrow">→</view>
+    <view><text class="summary-number accent">{{courseDrafts.length}}</text><text class="summary-label">课程草稿</text></view>
+  </view>
+
+  <view class="section draft-section">
+    <view class="section-head">
+      <view><view class="section-title">自动匹配草稿</view><view class="section-note">{{selectedDateLabel}} · 发布后才进入正式课表</view></view>
+      <button wx:if="{{courseDrafts.length}}" class="small-primary" loading="{{publishingAll}}" bindtap="publishAllDrafts">全部发布</button>
+    </view>
+    <view wx:if="{{courseDrafts.length}}" class="draft-list">
+      <view class="match-card" wx:for="{{courseDrafts}}" wx:key="id">
+        <view class="match-time">{{item.slotTime}}</view>
+        <view class="match-main"><view class="match-title">{{item.memberName}} · {{item.productName || '游泳课'}}</view><view class="match-meta">{{item.campus}} · {{item.coach}} · 余 {{item.remainingLessons === undefined ? '-' : item.remainingLessons}} 课时</view></view>
+        <view class="match-actions"><button class="publish-button" loading="{{approvalBusy === item.id}}" data-id="{{item.id}}" bindtap="approveDraft">发布</button><text data-id="{{item.id}}" bindtap="openAdjustment">调整</text><text class="reject-link" data-id="{{item.id}}" bindtap="rejectDraft">不排</text></view>
       </view>
     </view>
+    <view wx:else class="calm-empty">这一天还没有学员提交上课意向</view>
   </view>
 
-  <view class="grid">
-    <view class="metric tappable" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
-      <text class="metric-value">{{stats.pendingBookings}}</text>
-      <text class="metric-label">待审批预约</text>
-      <text class="metric-action">点我审批</text>
-    </view>
-    <view class="metric tappable" bindtap="go" data-url="/pages/admin-course-applications/admin-course-applications">
-      <text class="metric-value">{{stats.pendingApplications}}</text>
-      <text class="metric-label">课程申请</text>
-      <text class="metric-action">处理续课</text>
-    </view>
-    <view class="metric tappable" bindtap="go" data-url="/pages/admin-schedule/admin-schedule">
-      <text class="metric-value">{{stats.todaySchedules}}</text>
-      <text class="metric-label">今日课程</text>
-      <text class="metric-action">查看和排课</text>
-    </view>
-    <view class="metric tappable" bindtap="go" data-url="/pages/admin-members/admin-members?filter=low">
-      <text class="metric-value">{{stats.lowBalance}}</text>
-      <text class="metric-label">低课时风险</text>
-      <text class="metric-action">跟进续费</text>
-    </view>
-  </view>
-
-  <view class="card">
-    <view class="card-title">常用功能</view>
-    <view class="nav-list">
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-bookings/admin-bookings"><text class="nav-title">预约审批</text><text class="nav-meta">通过后生成排课</text></view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-course-applications/admin-course-applications"><text class="nav-title">课程申请</text><text class="nav-meta">处理学员续课</text></view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-schedule/admin-schedule"><text class="nav-title">排课</text><text class="nav-meta">特殊情况手动安排</text></view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-availability/admin-availability"><text class="nav-title">空余时间</text><text class="nav-meta">控制教练名额</text></view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-members/admin-members"><text class="nav-title">学员</text><text class="nav-meta">新增、修改、查课时</text></view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-staff/admin-staff"><text class="nav-title">账号</text><text class="nav-meta">新增和修改账号</text></view>
-      <view class="nav-card" bindtap="go" data-url="/pages/admin-import/admin-import"><text class="nav-title">批量导入</text><text class="nav-meta">粘贴名单一键录入</text></view>
-    </view>
-  </view>
-
-  <view class="card tappable" bindtap="go" data-url="/pages/admin-members/admin-members?filter=low">
-    <view class="row card-head"><view class="card-title">低课时/欠课提醒</view><text class="link-text">去跟进</text></view>
-    <block wx:if="{{lowBalanceMembers.length}}">
-      <view class="list-item" wx:for="{{lowBalanceMembers}}" wx:key="id">
-        <view class="row"><view><view class="name">{{item.chineseName}}</view><view class="meta">{{item.productName}} · 剩余 {{item.remainingLessons}} · {{item.coach}}</view></view><text class="badge {{item.status === '欠课' || item.status === '已完成' ? 'danger' : 'warn'}}">{{item.status}}</text></view>
+  <view class="section">
+    <view class="section-head"><view><view class="section-title">空闲教练</view><view class="section-note">教练提交后，老板决定是否开放给学员</view></view><text class="text-link" bindtap="go" data-url="/pages/admin-availability/admin-availability">每周模板</text></view>
+    <view class="coach-grid" wx:if="{{coachSupply.length}}">
+      <view class="coach-tile" wx:for="{{coachSupply}}" wx:key="coach">
+        <view class="coach-avatar">{{item.initial}}</view><view class="coach-name">{{item.coach}}</view><view class="coach-meta">{{item.campus}} · {{item.times.length}} 个时间</view><view class="coach-times">{{item.timeText}}</view>
+        <button wx:if="{{item.draftCount}}" class="open-button" data-coach="{{item.coach}}" bindtap="publishCoachSlots">开放给学员</button><text wx:else class="opened-label">已开放</text>
       </view>
-    </block>
-    <view wx:else class="empty">暂无低课时风险学员</view>
+    </view>
+    <view wx:else class="calm-empty">暂无教练空闲时间</view>
   </view>
 
-  <view class="card tappable" bindtap="go" data-url="/pages/admin-bookings/admin-bookings">
-    <view class="row card-head"><view class="card-title">最新预约</view><text class="link-text">去审批</text></view>
-    <block wx:if="{{pendingBookings.length}}">
-      <view class="list-item" wx:for="{{pendingBookings}}" wx:key="id"><view class="row"><view><view class="name">{{item.memberName}}</view><view class="meta">{{item.slotDate}} {{item.slotTime}} · {{item.coach}}</view></view><text class="badge warn">待审批</text></view></view>
-    </block>
-    <view wx:else class="empty">暂无待审批预约</view>
+  <view class="section">
+    <view class="section-head"><view><view class="section-title">已发布课程</view><view class="section-note">{{selectedDateLabel}}共 {{daySchedules.length}} 节</view></view><text class="text-link" bindtap="go" data-url="/pages/admin-schedule/admin-schedule?filter=today">完整课表</text></view>
+    <view class="schedule-row" wx:for="{{daySchedules}}" wx:key="id"><text class="schedule-time">{{item.lessonTime}}</text><view><view class="schedule-title">{{item.memberName}}</view><view class="schedule-meta">{{item.campus}} · {{item.coach}}</view></view><text class="status {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待上课'}}</text></view>
+    <view wx:if="{{!daySchedules.length}}" class="calm-empty">当天还没有正式课程</view>
+  </view>
+
+  <view class="section compact-section">
+    <view class="section-title">其他事项</view>
+    <view class="utility-grid">
+      <view class="utility-tile" bindtap="go" data-url="/pages/admin-leave/admin-leave"><text class="utility-strong">{{pendingLeaves}}</text><text>请假补课</text></view>
+      <view class="utility-tile" bindtap="go" data-url="/pages/admin-course-applications/admin-course-applications"><text class="utility-strong">{{pendingApplications}}</text><text>续课申请</text></view>
+      <view class="utility-tile" bindtap="go" data-url="/pages/admin-coaches/admin-coaches"><text class="utility-strong">{{coachCount}} 位</text><text>教练与登录</text></view>
+      <view class="utility-tile" bindtap="go" data-url="/pages/admin-members/admin-members"><text class="utility-strong">{{memberCount}} 位</text><text>学员与课时</text></view>
+      <view class="utility-tile" bindtap="go" data-url="/pages/admin-availability/admin-availability"><text class="utility-strong">排课</text><text>固定模板与临时调整</text></view>
+      <view class="utility-tile" bindtap="go" data-url="/pages/admin-staff/admin-staff"><text class="utility-strong">账号</text><text>高级账号管理</text></view>
+    </view>
+  </view>
+
+  <view class="utility-row"><text bindtap="changePassword">修改密码</text><text bindtap="logout">退出登录</text></view>
+
+  <view class="modal-mask" wx:if="{{adjustmentVisible}}" bindtap="closeAdjustment">
+    <view class="modal-card adjustment-modal" catchtap="noop">
+      <view class="modal-title">调整 {{adjustingDraft.memberName}} 的课程</view>
+      <view class="modal-meta">直接选择其他教练时间</view>
+      <view class="adjustment-list">
+        <view class="adjustment-tile {{selectedAdjustmentSlotId === item.id ? 'active' : ''}}" wx:for="{{adjustmentSlots}}" wx:key="id" data-id="{{item.id}}" bindtap="selectAdjustmentSlot"><view class="adjustment-time">{{item.slotTime}}</view><view class="adjustment-meta">{{item.coach}} · {{item.campus}} · 余 {{item.id === adjustingDraft.slotId ? (item.left + 1) : item.left}}</view></view>
+      </view>
+      <view wx:if="{{!adjustmentSlots.length}}" class="calm-empty">没有其他可用时间</view>
+      <view class="modal-actions"><button bindtap="closeAdjustment">取消</button><button class="primary" bindtap="saveAdjustment">保存调整</button></view>
+    </view>
   </view>
 </view>

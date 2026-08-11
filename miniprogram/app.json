@@ -3,8 +3,10 @@
     "pages/login/login",
     "pages/admin/admin",
     "pages/admin-bookings/admin-bookings",
+    "pages/admin-leave/admin-leave",
     "pages/admin-course-applications/admin-course-applications",
     "pages/admin-schedule/admin-schedule",
+    "pages/admin-coaches/admin-coaches",
     "pages/admin-members/admin-members",
     "pages/admin-import/admin-import",
     "pages/admin-availability/admin-availability",
@@ -12,7 +14,6 @@
     "pages/coach/coach",
     "pages/coach-schedule/coach-schedule",
     "pages/coach-members/coach-members",
-    "pages/coach-availability/coach-availability",
     "pages/student/student",
     "pages/student-booking/student-booking",
     "pages/student-records/student-records",
@@ -26,5 +27,6 @@
     "backgroundTextStyle": "dark"
   },
   "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
   "sitemapLocation": "sitemap.json"
 }

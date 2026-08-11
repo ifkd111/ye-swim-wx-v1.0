@@ -23,7 +23,21 @@ function requireValue(value, message) {
 }
 
 function seedSecret() {
-  return process.env.YE_SWIM_SEED_SECRET || "ye-swim-local-seed-v1";
+  return requireValue(process.env.YE_SWIM_SEED_SECRET, "缺少 YE_SWIM_SEED_SECRET，请使用随机长密钥");
+}
+
+function securityVariables() {
+  const variables = [
+    { key: "YE_SWIM_SEED_SECRET", value: seedSecret() },
+    { key: "YE_SWIM_ENABLE_TEST_LOGIN", value: process.env.YE_SWIM_ENABLE_TEST_LOGIN === "true" ? "true" : "false" },
+    { key: "YE_SWIM_ALLOW_ADMIN_BOOTSTRAP", value: process.env.YE_SWIM_ALLOW_ADMIN_BOOTSTRAP === "true" ? "true" : "false" },
+    { key: "YE_SWIM_ALLOW_ADMIN_REBIND", value: process.env.YE_SWIM_ALLOW_ADMIN_REBIND === "true" ? "true" : "false" },
+    { key: "YE_SWIM_ENABLE_SEED_IMPORT", value: process.env.YE_SWIM_ENABLE_SEED_IMPORT === "true" ? "true" : "false" }
+  ];
+  if (process.env.YE_SWIM_ENABLE_TEST_LOGIN === "true") {
+    variables.push({ key: "YE_SWIM_TEST_PHONE", value: requireValue(process.env.YE_SWIM_TEST_PHONE, "开启测试登录时必须设置 YE_SWIM_TEST_PHONE") });
+  }
+  return variables;
 }
 
 function createProject() {
@@ -62,6 +76,7 @@ async function main() {
   const env = requireValue(getArg("env", process.env.WX_CLOUD_ENV), "缺少 --env=云环境ID");
   const name = getArg("name", "api");
   const functionPath = getArg("path", path.join(root, "cloudfunctions", name));
+  const installDependency = getArg("install-dependency", "true") !== "false";
   const project = createProject();
   const appid = (await project.getExtAppid()) || project.appid;
   initCloudAPI(appid);
@@ -90,19 +105,14 @@ async function main() {
         memorySize: 256,
         timeout: 60,
         environment: {
-          variables: [
-            {
-              key: "YE_SWIM_SEED_SECRET",
-              value: seedSecret()
-            }
-          ]
+          variables: securityVariables()
         },
         role: "TCB_QcsRole",
         runtime: "Nodejs16.13",
         namespace: env,
         region,
         stamp: "MINI_QCBASE",
-        installDependency: false,
+        installDependency,
         codeSecret
       },
       opts
@@ -116,14 +126,9 @@ async function main() {
           region,
           memorySize: 256,
           timeout: 60,
-          installDependency: false,
+          installDependency,
           environment: {
-            variables: [
-              {
-                key: "YE_SWIM_SEED_SECRET",
-                value: seedSecret()
-              }
-            ]
+            variables: securityVariables()
           }
         },
         opts
@@ -141,7 +146,7 @@ async function main() {
       namespace: env,
       region,
       handler: "index.main",
-      installDependency: false,
+      installDependency,
       fileData: buffer.toString("base64"),
       codeSecret
     },
@@ -156,6 +161,7 @@ async function main() {
         region,
         filesCount: Object.keys(zipped.files).length,
         packSize: buffer.byteLength,
+        installDependency,
         message: "云函数代码已提交更新"
       },
       null,

@@ -16,7 +16,8 @@
     "preloadBackgroundData": false,
     "autoAudits": false,
     "uglifyFileName": false,
-    "minifyWXML": true
+    "minifyWXML": true,
+    "minifyWXSS": true
   },
   "simulatorType": "wechat",
   "simulatorPluginLibVersion": {},

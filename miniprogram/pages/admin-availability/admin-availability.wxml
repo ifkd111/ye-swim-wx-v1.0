@@ -1,52 +1,98 @@
 <view class="page">
   <view class="topbar">
     <view>
-      <view class="title">空余时间</view>
-      <view class="subtitle">老板控制哪些教练时间对学员开放</view>
+      <view class="title">老板排课</view>
+      <view class="subtitle">固定安排一键生成，临时变化随时调整</view>
     </view>
   </view>
 
-  <view class="card">
-    <view class="card-title">发布可预约时间</view>
-    <view class="field">
-      <text class="field-label">日期</text>
-      <input value="{{form.slotDate}}" placeholder="2026-06-02" bindinput="input" data-field="slotDate" />
+  <view class="card hero-card">
+    <view class="row card-head">
+      <view>
+        <view class="card-title">下周课程</view>
+        <view class="meta">模板云端保存，生成预览后由你确认发布</view>
+      </view>
+      <text class="badge">老板确认</text>
     </view>
-    <view class="field">
-      <text class="field-label">时间</text>
-      <input value="{{form.slotTime}}" placeholder="17:00-18:00" bindinput="input" data-field="slotTime" />
-    </view>
-    <view class="field">
-      <text class="field-label">校区</text>
-      <input value="{{form.campus}}" placeholder="绿洲" bindinput="input" data-field="campus" />
-    </view>
-    <view class="field">
-      <text class="field-label">教练</text>
-      <input value="{{form.coach}}" placeholder="绿洲教练" bindinput="input" data-field="coach" />
-    </view>
-    <view class="field">
-      <text class="field-label">名额</text>
-      <input type="number" value="{{form.capacity}}" bindinput="input" data-field="capacity" />
-    </view>
-    <button class="primary" bindtap="create">发布</button>
-  </view>
 
-  <view class="card">
-    <view class="card-title">已有时间</view>
-    <block wx:if="{{slots.length}}">
-      <view class="list-item" wx:for="{{slots}}" wx:key="id">
+    <block wx:if="{{weeklyTemplates.length}}">
+      <view class="list-item" wx:for="{{weeklyTemplates}}" wx:key="id">
         <view class="row">
           <view>
-            <view class="name">{{item.coach}}</view>
-            <view class="meta">{{item.slotDate}} {{item.slotTime}} · {{item.campus}} · 名额 {{item.capacity}}</view>
+            <view class="name">{{item.weekdayLabel}} {{item.slotTime}}</view>
+            <view class="meta">{{item.campus}} · {{item.coach}} · {{item.capacity}} 人</view>
           </view>
-          <text class="badge {{item.status === 'published' ? '' : 'warn'}}">{{item.status === 'published' ? '已发布' : '草稿'}}</text>
-        </view>
-        <view class="toolbar" wx:if="{{item.status !== 'published'}}">
-          <button class="primary" data-id="{{item.id}}" bindtap="publish">发布</button>
+          <button class="mini danger compact-button" data-id="{{item.id}}" bindtap="removeWeeklyTemplate">删除</button>
         </view>
       </view>
     </block>
-    <view wx:else class="empty">暂无空余时间</view>
+    <view wx:else class="empty compact-empty">还没有固定安排，先在下面添加一条</view>
+
+    <view class="toolbar template-actions">
+      <button class="primary" bindtap="generateNextWeek">生成下周预览</button>
+      <button bindtap="copyThisWeek">复制本周</button>
+    </view>
+  </view>
+
+  <view class="card">
+    <view class="card-title">添加每周固定安排</view>
+    <view class="field"><text class="field-label">星期</text><view class="option-board weekday-board"><view class="option-block {{weeklyForm.weekday === item.value ? 'active' : ''}}" wx:for="{{weekdayOptions}}" wx:key="value" data-value="{{item.value}}" bindtap="weeklyWeekdayBlock">{{item.label}}</view></view></view>
+    <view class="field"><text class="field-label">时间</text><view class="option-board time-board"><view class="option-block {{weeklyForm.slotTime === item ? 'active' : ''}}" wx:for="{{timeOptions}}" wx:key="*this" data-value="{{item}}" bindtap="weeklyTimeBlock">{{item}}</view></view></view>
+    <view class="field"><text class="field-label">校区</text><view class="option-board"><view class="option-block {{weeklyForm.campus === item ? 'active' : ''}}" wx:for="{{campuses}}" wx:key="*this" data-value="{{item}}" bindtap="weeklyCampusBlock">{{item}}</view></view></view>
+    <view class="field"><text class="field-label">教练</text><view class="option-board"><view class="option-block {{weeklyForm.coach === item ? 'active' : ''}}" wx:for="{{coaches}}" wx:key="*this" data-value="{{item}}" bindtap="weeklyCoachBlock">{{item}}</view></view></view>
+    <view class="row capacity-row">
+      <view><view class="field-label">每节名额</view><view class="name">{{weeklyForm.capacity}} 人</view></view>
+      <view class="toolbar inline-toolbar"><button class="mini" data-delta="-1" bindtap="weeklyCapacity">-</button><button class="mini" data-delta="1" bindtap="weeklyCapacity">+</button></view>
+    </view>
+    <button class="wide-action" bindtap="addWeeklyTemplate">加入每周模板</button>
+  </view>
+
+  <view class="card preview-card" wx:if="{{previewSlots.length}}">
+    <view class="row card-head">
+      <view><view class="card-title">发布前预览</view><view class="meta">共 {{previewSlots.length}} 节，不合适的可先移除</view></view>
+      <button class="mini compact-button" bindtap="clearPreview">清空</button>
+    </view>
+    <view class="list-item" wx:for="{{previewSlots}}" wx:key="index">
+      <view class="row">
+        <view><view class="name">{{item.slotDate}} {{item.slotTime}}</view><view class="meta">{{item.campus}} · {{item.coach}} · {{item.capacity}} 人</view></view>
+        <button class="mini danger compact-button" data-index="{{index}}" bindtap="removePreview">移除</button>
+      </view>
+    </view>
+    <button class="primary wide-action" bindtap="publishPreview">确认发布 {{previewSlots.length}} 节</button>
+  </view>
+
+  <view class="card">
+    <view class="card-title">临时加一节</view>
+    <view class="meta section-tip">临时加课不用改模板，选好后直接发布。</view>
+    <view class="field">
+      <text class="field-label">日期</text>
+      <view class="chip-list"><view class="chip {{form.slotDate === item.value ? 'active' : ''}}" wx:for="{{dateOptions}}" wx:key="value" data-value="{{item.value}}" bindtap="pickDate">{{item.label}}</view></view>
+      <input value="{{form.slotDate}}" placeholder="也可手输日期" bindinput="input" data-field="slotDate" />
+    </view>
+    <view class="field">
+      <text class="field-label">时间</text>
+      <view class="chip-list"><view class="chip {{form.slotTime === item ? 'active' : ''}}" wx:for="{{timeOptions}}" wx:key="*this" data-value="{{item}}" bindtap="pickTime">{{item}}</view></view>
+    </view>
+    <view class="field"><text class="field-label">校区</text><view class="option-board"><view class="option-block {{form.campus === item ? 'active' : ''}}" wx:for="{{campuses}}" wx:key="*this" data-value="{{item}}" bindtap="pickCampusBlock">{{item}}</view></view></view>
+    <view class="field"><text class="field-label">教练</text><view class="option-board"><view class="option-block {{form.coach === item ? 'active' : ''}}" wx:for="{{coaches}}" wx:key="*this" data-value="{{item}}" bindtap="pickCoachBlock">{{item}}</view></view></view>
+    <view class="row capacity-row">
+      <view><view class="field-label">名额</view><view class="name">{{form.capacity}} 人</view></view>
+      <view class="toolbar inline-toolbar"><button class="mini" data-delta="-1" bindtap="capacity">-</button><button class="mini" data-delta="1" bindtap="capacity">+</button></view>
+    </view>
+    <button class="primary wide-action" bindtap="create">立即发布给学员</button>
+  </view>
+
+  <view class="card">
+    <view class="card-title">近期已发布</view>
+    <block wx:if="{{slots.length}}">
+      <view class="list-item" wx:for="{{slots}}" wx:key="id">
+        <view class="row">
+          <view><view class="name">{{item.dayLabel}} {{item.slotTime}}</view><view class="meta">{{item.campus}} · {{item.coach}} · 已约 {{item.bookedCount || 0}}/{{item.capacity}}</view></view>
+          <text class="badge {{item.status === 'closed' ? 'danger' : item.left === 0 ? 'warn' : ''}}">{{item.statusLabel}}</text>
+        </view>
+        <button wx:if="{{item.status === 'published'}}" class="mini danger close-button" data-id="{{item.id}}" bindtap="close">停止继续预约</button>
+      </view>
+    </block>
+    <view wx:else class="empty">还没有发布课程</view>
   </view>
 </view>
