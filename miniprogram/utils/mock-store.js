@@ -1031,6 +1031,9 @@ function loginByPhone(payload) {
   if (matches.length > 1) throw new Error("该手机号绑定了多个账号，请联系老板处理");
   const account = matches[0];
   if (!account) throw new Error("该手机号未开通账号，请联系老板绑定");
+  if (account.role === "admin") {
+    throw new Error("老板账号不能使用微信手机号登录，请切换到老板管理并使用手机号和密码");
+  }
 
   const openid = payload.openid || "mock-phone-openid";
   if (account.openid && account.openid !== openid) {

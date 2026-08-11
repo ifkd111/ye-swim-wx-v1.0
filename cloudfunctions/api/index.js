@@ -419,6 +419,9 @@ async function loginByPhone(payload, wxContext) {
   }
   const account = await getAccountByPhone(phone);
   if (!account) throw new Error("该手机号未开通账号，请联系老板绑定");
+  if (account.role === "admin") {
+    throw new Error("老板账号不能使用微信手机号登录，请切换到老板管理并使用手机号和密码");
+  }
   if (account.openid && account.openid !== wxContext.OPENID) throw new Error("该手机号账号已经绑定其他微信");
 
   const patch = {

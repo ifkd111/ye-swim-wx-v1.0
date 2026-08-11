@@ -81,6 +81,13 @@ function main() {
     }
   }).account;
   assert.strictEqual(adminWithPhone.phone, "13333330000", "老板账号应能绑定手机号");
+  assert.throws(
+    () => loginByPhone("13333330000", "mistaken-owner-wechat"),
+    /老板账号不能使用微信手机号登录/,
+    "老板误点微信手机号入口时必须被拒绝"
+  );
+  const storedAdminAfterMistake = mock.loadState().accounts.find((item) => item.account === "yeats");
+  assert.strictEqual(storedAdminAfterMistake.openid, null, "老板误点微信手机号入口后仍不能产生微信绑定");
   const adminByPhone = login("13333330000", "1324", adminOpenid);
   assert.strictEqual(adminByPhone.role, "admin", "老板应能用手机号加密码登录");
   call(admin, "saveAccount", {

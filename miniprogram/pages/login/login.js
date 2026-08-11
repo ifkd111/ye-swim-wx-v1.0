@@ -54,11 +54,21 @@ Page({
 
   login() {
     if (this.data.loading) return;
+    const account = String(this.data.account || "").trim();
+    const password = String(this.data.password || "");
+    if (!account) {
+      api.toast("请输入老板手机号");
+      return;
+    }
+    if (!password) {
+      api.toast("请输入老板密码");
+      return;
+    }
     this.setData({ loading: true });
     api
       .call("login", {
-        account: this.data.account,
-        password: this.data.password
+        account,
+        password
       })
       .then((result) => {
         api.saveSession(result.session);
