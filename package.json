@@ -1,6 +1,6 @@
 {
   "name": "ye-swim-wx-v1.0",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "private": true,
   "description": "叶 微信小程序，支持自助登记、教练每日码、家长扫码消课和老板审核管理。",
   "scripts": {

@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 版本：`2.1.0`
+- 版本：`2.1.1`
 - 小程序 AppID：`wx7f2d509804954eaf`
 - 云环境 ID：`cloudbase-d6ge373q7724bcfe4`
 - 数据源：微信云开发正式环境；所有业务写入由 `cloudfunctions/api` 统一处理，正式环境不会凭公开默认密码自动创建或重置老板账号。
@@ -58,7 +58,7 @@ npm run migrate:v1.3 -- --env=cloudbase-d6ge373q7724bcfe4
 npm run ci:quality
 ```
 
-当前 `2.1.0` 使用真实微信云开发环境；远端 GitHub 和 tag 发布后按发布记录同步。
+当前 `2.1.1` 在开发版、体验版和正式版均使用真实微信云开发环境；远端 GitHub 和 tag 发布后按发布记录同步。
 
 ## 登录与鉴权
 

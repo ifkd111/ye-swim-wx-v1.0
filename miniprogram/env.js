@@ -1,5 +1,5 @@
 module.exports = {
-  version: "2.1.0",
+  version: "2.1.1",
   envId: "cloudbase-d6ge373q7724bcfe4",
   useMock: false,
   testLogin: {
@@ -7,7 +7,7 @@ module.exports = {
     phone: ""
   },
   developerMock: {
-    enabled: true,
+    enabled: false,
     phone: "13818793977"
   },
   subscriptionTemplates: {
