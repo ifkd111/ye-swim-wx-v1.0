@@ -11,7 +11,7 @@
 .coach-list-avatar { width: 66rpx; height: 66rpx; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 19rpx; background: #dcebe6; color: #176f63; font-size: 28rpx; font-weight: 850; }
 .coach-list-name { font-size: 29rpx; font-weight: 850; }
 .coach-account { margin-top: 5rpx; color: #7a857f; font-size: 21rpx; }
-.coach-facts { display: grid; grid-template-columns: 1.4fr 1fr; gap: 12rpx; margin-top: 18rpx; }
+.coach-facts { display: grid; grid-template-columns: 1fr; gap: 12rpx; margin-top: 18rpx; }
 .coach-facts > view { padding: 15rpx 17rpx; border-radius: 15rpx; background: #f5f7f5; }
 .fact-value, .fact-label { display: block; }
 .fact-value { color: #233a33; font-size: 25rpx; font-weight: 850; }

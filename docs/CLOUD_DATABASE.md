@@ -1,19 +1,24 @@
 # 云数据库集合
 
-v1.0 使用这些集合：
+v2.0 日常使用的核心集合：
 
-- `accounts`：账号、角色、微信绑定、密码哈希、教练/学员绑定。
-- `members`：学员档案。
+- `accounts`：老板、教练和家庭账号、手机号、微信绑定及角色。
+- `members`：学员姓名、家长手机号和总课时。
+- `attendanceLogs`：扫码消课、老板补录、修改和撤销信息。
+- `dailyCoachCodes`：每位教练按中国日期固定的每日码及不同环境图片。
+- `lessonAdjustments`：老板加课或调整总课时的审计流水。
+- `auditLogs`：撤销、纠错、补录等关键操作日志。
+
+以下 v1 集合保留归档，不再进入 v2 日常界面：
+
 - `courseProducts`：课程产品。
 - `availabilitySlots`：教练空余时间。
 - `bookingRequests`：预约申请。
 - `schedules`：正式排课。
-- `attendanceLogs`：出勤和消课。
 - `courseApplications`：课程申请。
 - `leaveRequests`：学员请假申请和审批状态。
 - `makeupCredits`：请假通过后生成的补课额度和补课排课状态。
 - `lessonFeedbacks`：课后反馈标签、备注和成长记录。
-- `auditLogs`：关键操作日志。
 - `settings`：老板每周排课模板等云端运营配置。
 
 数据库权限建议：

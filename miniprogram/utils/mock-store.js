@@ -44,6 +44,7 @@ function initialState() {
         role: "student",
         fullName: "白卓可",
         memberId: "member-001",
+        memberIds: ["member-001", "member-002"],
         phone: "13333330002",
         loginMode: "phone",
         bindingStatus: "pending",
@@ -158,6 +159,8 @@ function initialState() {
       }
     ],
     attendanceLogs: [],
+    dailyCoachCodes: [],
+    lessonAdjustments: [],
     courseApplications: [],
     leaveRequests: [],
     makeupCredits: [],
@@ -195,6 +198,11 @@ function migrateState(state) {
   state.makeupCredits = state.makeupCredits || [];
   state.lessonFeedbacks = state.lessonFeedbacks || [];
   state.weeklyAvailabilityTemplates = state.weeklyAvailabilityTemplates || [];
+  state.dailyCoachCodes = state.dailyCoachCodes || [];
+  state.lessonAdjustments = state.lessonAdjustments || [];
+  state.accounts.forEach((account) => {
+    if (account.role === "student" && !Array.isArray(account.memberIds)) account.memberIds = account.memberId ? [account.memberId] : [];
+  });
   if (state.weeklyAvailabilityTemplateConfigured === undefined) state.weeklyAvailabilityTemplateConfigured = false;
   return state;
 }
@@ -255,7 +263,9 @@ function assertRole(viewer, roles) {
 function memberViews(state, viewer) {
   const usedByMember = {};
   state.attendanceLogs.forEach((log) => {
-    usedByMember[log.memberId] = (usedByMember[log.memberId] || 0) + Number(log.lessonsDeducted || 0);
+    if (log.status === "reversed" || log.reversedAt) return;
+    const lessons = Number(log.lessonsDeducted);
+    usedByMember[log.memberId] = (usedByMember[log.memberId] || 0) + (lessons > 0 ? lessons : 1);
   });
 
   return state.members
@@ -263,7 +273,7 @@ function memberViews(state, viewer) {
       if (!viewer) return false;
       if (viewer.role === "admin") return true;
       if (viewer.role === "coach") return member.coach === viewer.coachName;
-      if (viewer.role === "student") return member.id === viewer.memberId;
+      if (viewer.role === "student") return [].concat(viewer.memberIds || [], viewer.memberId || []).indexOf(member.id) >= 0;
       return false;
     })
     .map((member) => {
@@ -275,6 +285,155 @@ function memberViews(state, viewer) {
         status: balance.status
       });
     });
+}
+
+function todayChina() {
+  return rules.formatDateChina(new Date());
+}
+
+function timeChina() {
+  const date = new Date();
+  return String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0");
+}
+
+function consumptionHomeData(state, viewer) {
+  const members = memberViews(state, viewer);
+  const memberIds = members.map((item) => item.id);
+  let logs = state.attendanceLogs.slice();
+  if (viewer.role === "coach") logs = logs.filter((item) => item.coachAccount === viewer.account || (!item.coachAccount && item.coach === viewer.coachName));
+  if (viewer.role === "student") logs = logs.filter((item) => memberIds.indexOf(item.memberId) >= 0);
+  logs = logs.map((item) => Object.assign({}, item, { lessonsDeducted: item.status !== "reversed" && Number(item.lessonsDeducted) <= 0 ? 1 : Number(item.lessonsDeducted || 0) }))
+    .sort((a, b) => String(b.createdAt || b.attendanceDate || "").localeCompare(String(a.createdAt || a.attendanceDate || "")));
+  const todayLogs = logs.filter((item) => item.attendanceDate === todayChina() && item.status !== "reversed" && !item.reversedAt);
+  return {
+    viewer: Object.assign({}, viewer, { password: undefined }),
+    members,
+    logs: logs.slice(0, viewer.role === "admin" ? 500 : 100),
+    todayLogs,
+    accounts: viewer.role === "admin" ? state.accounts.map((item) => Object.assign({}, item, { password: undefined, wechatBound: Boolean(item.openid) })) : [],
+    stats: {
+      todayStudents: Array.from(new Set(todayLogs.map((item) => item.memberId))).length,
+      todayLessons: todayLogs.reduce((sum, item) => sum + Number(item.lessonsDeducted || 0), 0),
+      debtMembers: members.filter((item) => Number(item.remainingLessons) < 0).length
+    }
+  };
+}
+
+function dailyCoachCode(state, viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const date = todayChina();
+  let code = state.dailyCoachCodes.find((item) => item.codeDate === date && item.coachAccount === viewer.account);
+  if (!code) {
+    code = { id: newId("daily-code"), token: newId("token"), codeDate: date, coachAccount: viewer.account, coachName: viewer.coachName || viewer.fullName || "老板", status: "active" };
+    state.dailyCoachCodes.push(code);
+  }
+  return Object.assign({}, code, { envVersion: payload.envVersion || "develop", fileId: "" });
+}
+
+function checkinContext(state, viewer, payload) {
+  assertRole(viewer, ["student"]);
+  const token = String(payload.scene || payload.token || "").replace(/^t=/, "");
+  const code = state.dailyCoachCodes.find((item) => item.token === token && item.status === "active");
+  if (!code) throw new Error("教练码无效");
+  if (code.codeDate !== todayChina()) throw new Error("该教练码已过期，请扫描今天的新码");
+  const members = memberViews(state, viewer);
+  if (!members.length) throw new Error("当前手机号没有绑定学员，请联系老板");
+  return { codeDate: code.codeDate, coachAccount: code.coachAccount, coachName: code.coachName, confirmTime: timeChina(), members };
+}
+
+function confirmDailyCheckin(state, viewer, payload) {
+  const context = checkinContext(state, viewer, payload);
+  const lessons = Number(payload.lessons || 1);
+  if ([1, 2, 3].indexOf(lessons) < 0) throw new Error("家长每次只能选择扣 1、2 或 3 节");
+  const allowed = context.members.map((item) => item.id);
+  const memberIds = Array.from(new Set(payload.memberIds || [])).filter((id) => allowed.indexOf(id) >= 0);
+  if (!memberIds.length) throw new Error("请至少选择一名到场学员");
+  const batchId = "scan-" + String(payload.requestId || newId("request"));
+  const previous = state.attendanceLogs.filter((item) => item.batchId === batchId);
+  if (previous.length) return { message: "消课成功", batchId, logs: previous, members: memberViews(state, viewer), confirmedAt: previous[0].createdAt, idempotent: true };
+  const duplicate = memberIds.find((memberId) => state.attendanceLogs.some((log) => log.memberId === memberId && log.attendanceDate === todayChina() && log.coachAccount === context.coachAccount && log.source === "coach_daily_qr" && log.status !== "reversed" && !log.reversedAt));
+  if (duplicate) throw new Error((context.members.find((item) => item.id === duplicate) || {}).chineseName + " 今天已在该教练处消课");
+  const createdAt = new Date().toISOString();
+  const logs = memberIds.map((memberId) => {
+    const member = context.members.find((item) => item.id === memberId);
+    const log = { id: newId("attendance"), batchId, attendanceDate: todayChina(), attendanceTime: timeChina(), memberId, memberName: member.chineseName, coachAccount: context.coachAccount, coach: context.coachName, lessonsDeducted: lessons, source: "coach_daily_qr", sourceNote: "家长扫码消课", status: "active", createdBy: viewer.account, createdAt, updatedAt: createdAt };
+    state.attendanceLogs.push(log);
+    return log;
+  });
+  return { message: "消课成功", batchId, logs, members: memberViews(state, viewer), confirmedAt: createdAt };
+}
+
+function bindMemberGuardian(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const member = state.members.find((item) => item.id === payload.memberId);
+  const phone = rules.normalizePhone(payload.phone || member && member.phone);
+  if (!member) throw new Error("学员不存在");
+  if (!rules.isChinaMobile(phone)) throw new Error("请填写家长的 11 位手机号");
+  let target = state.accounts.find((item) => item.role === "student" && item.phone === phone && item.status !== "disabled");
+  if (!target) {
+    const count = state.accounts.filter((item) => item.role === "student").length + 1;
+    target = { id: newId("account"), account: "xy" + String(count).padStart(3, "0"), role: "student", fullName: member.chineseName + "家长", phone, memberId: member.id, memberIds: [member.id], loginMode: "phone", bindingStatus: "pending", openid: null, status: "active" };
+    state.accounts.push(target);
+  } else {
+    target.memberIds = Array.from(new Set([].concat(target.memberIds || [], target.memberId || [], member.id)));
+    target.memberId = target.memberIds[0];
+  }
+  state.accounts.filter((item) => item.role === "student" && item.id !== target.id).forEach((item) => {
+    item.memberIds = [].concat(item.memberIds || [], item.memberId || []).filter((id) => id && id !== member.id);
+    item.memberId = item.memberIds[0] || "";
+    if (!item.memberIds.length) item.status = "disabled";
+  });
+  member.phone = phone;
+  return { message: "家长手机号已绑定", account: target };
+}
+
+function reverseConsumption(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const log = state.attendanceLogs.find((item) => item.id === payload.logId);
+  if (!log) throw new Error("消课流水不存在");
+  if (log.status === "reversed" || log.reversedAt) throw new Error("该流水已经撤销");
+  Object.assign(log, { status: "reversed", reversedAt: new Date().toISOString(), reversedBy: viewer.account, reverseReason: payload.reason || "老板纠错" });
+  return { message: "已撤销并返还课时", log };
+}
+
+function adjustConsumption(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const log = state.attendanceLogs.find((item) => item.id === payload.logId);
+  const lessons = Number(payload.lessons);
+  if (!log) throw new Error("消课流水不存在");
+  if (!Number.isInteger(lessons) || lessons < 1 || lessons > 99) throw new Error("课时应为 1 至 99 的整数");
+  log.correctedFrom = Number(log.lessonsDeducted || 1); log.lessonsDeducted = lessons; log.correctedAt = new Date().toISOString(); log.correctedBy = viewer.account;
+  return { message: "消课课时已调整", log };
+}
+
+function manualConsumption(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const lessons = Number(payload.lessons);
+  if (!Number.isInteger(lessons) || lessons < 1 || lessons > 99) throw new Error("课时应为 1 至 99 的整数");
+  const coach = state.accounts.find((item) => item.account === (payload.coachAccount || viewer.account));
+  if (!coach || ["admin", "coach"].indexOf(coach.role) < 0) throw new Error("教练不存在");
+  const memberIds = Array.from(new Set(payload.memberIds || []));
+  if (!memberIds.length) throw new Error("请选择学员");
+  const batchId = newId("manual");
+  memberIds.forEach((memberId) => {
+    const member = state.members.find((item) => item.id === memberId);
+    if (!member) throw new Error("学员不存在");
+    state.attendanceLogs.push({ id: newId("attendance"), batchId, attendanceDate: payload.attendanceDate || todayChina(), attendanceTime: payload.attendanceTime || timeChina(), memberId, memberName: member.chineseName, coachAccount: coach.account, coach: coach.coachName || coach.fullName, lessonsDeducted: lessons, source: "admin_manual", sourceNote: payload.reason || "老板补录", status: "active", createdBy: viewer.account, createdAt: new Date().toISOString() });
+  });
+  return { message: "补录消课成功", batchId };
+}
+
+function addMemberLessons(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const member = state.members.find((item) => item.id === payload.memberId);
+  const amount = Number(payload.amount);
+  if (!member) throw new Error("学员不存在");
+  if (!Number.isInteger(amount) || !amount || Math.abs(amount) > 999) throw new Error("调整课时应为 -999 至 999 的非零整数");
+  const before = Number(member.totalLessons || 0); const after = before + amount;
+  if (after < 0) throw new Error("总课时不能小于 0");
+  member.totalLessons = after;
+  state.lessonAdjustments.push({ id: newId("lesson-adjustment"), memberId: member.id, before, amount, after, reason: payload.reason || "老板加课", operator: viewer.account, createdAt: new Date().toISOString() });
+  return { message: "学员总课时已更新", before, amount, after };
 }
 
 function schedulesFor(state, viewer) {
@@ -505,8 +664,12 @@ function productDefaults(state, payload, current) {
 
 function memberPayload(state, payload, current) {
   const member = payload.member || payload;
-  const product = productDefaults(state, member, current);
-  return Object.assign({}, current || {}, product, {
+  const totalLessons = member.totalLessons !== undefined && member.totalLessons !== "" ? Number(member.totalLessons) : current ? Number(current.totalLessons || 0) : 0;
+  return Object.assign({}, current || {}, {
+    productId: current && current.productId || "",
+    productName: current && current.productName || "",
+    productType: current && current.productType || "",
+    totalLessons: Number.isFinite(totalLessons) ? totalLessons : 0,
     chineseName: String(member.chineseName || current && current.chineseName || "").trim(),
     phone: String(member.phone || "").trim(),
     wechat: String(member.wechat || current && current.wechat || "").trim(),
@@ -524,6 +687,7 @@ function saveMember(state, viewer, payload) {
   const current = id ? state.members.find((item) => item.id === id) : null;
   const member = memberPayload(state, raw, current);
   if (!member.chineseName) throw new Error("学员姓名不能为空");
+  if (!Number.isFinite(Number(member.totalLessons)) || Number(member.totalLessons) < 0 || Number(member.totalLessons) > 99999) throw new Error("总课时应为 0 至 99999");
 
   if (current) {
     Object.assign(current, member, { updatedAt: new Date().toISOString() });
@@ -732,7 +896,6 @@ function loginByPhone(payload) {
   if (matches.length > 1) throw new Error("该手机号绑定了多个账号，请联系老板处理");
   const account = matches[0];
   if (!account) throw new Error("该手机号未开通账号，请联系老板绑定");
-  if (account.role === "admin") throw new Error("老板账号请使用账号密码登录");
 
   const openid = payload.openid || "mock-phone-openid";
   if (account.openid && account.openid !== openid) {
@@ -1242,6 +1405,15 @@ function call(action, payload) {
 
   let result;
   if (action === "getHomeData") result = homeData(state, viewer);
+  else if (action === "consumptionHomeData") result = consumptionHomeData(state, viewer);
+  else if (action === "dailyCoachCode") result = dailyCoachCode(state, viewer, payload);
+  else if (action === "checkinContext") result = checkinContext(state, viewer, payload);
+  else if (action === "confirmDailyCheckin") result = confirmDailyCheckin(state, viewer, payload);
+  else if (action === "bindMemberGuardian") result = bindMemberGuardian(state, viewer, payload);
+  else if (action === "reverseConsumption") result = reverseConsumption(state, viewer, payload);
+  else if (action === "adjustConsumption") result = adjustConsumption(state, viewer, payload);
+  else if (action === "manualConsumption") result = manualConsumption(state, viewer, payload);
+  else if (action === "addMemberLessons") result = addMemberLessons(state, viewer, payload);
   else if (action === "listPagedData") result = listPagedData(state, viewer, payload);
   else if (action === "saveMember") result = saveMember(state, viewer, payload);
   else if (action === "bulkImportMembers") result = bulkImportMembers(state, viewer, payload);

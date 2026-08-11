@@ -6,7 +6,7 @@
     </view>
 
     <view class="section filter-section">
-      <input class="search-input" value="{{keyword}}" placeholder="搜索姓名、手机号、校区" bindinput="search" />
+      <input class="search-input" value="{{keyword}}" placeholder="搜索姓名或手机号" bindinput="search" />
       <view class="coach-filter-row">
         <view class="filter-block {{filter === 'all' ? 'active' : ''}}" data-filter="all" bindtap="setFilter">全部 {{filterStats.all}}</view>
         <view class="filter-block {{filter === 'active' ? 'active' : ''}}" data-filter="active" bindtap="setFilter">启用 {{filterStats.active}}</view>
@@ -17,12 +17,11 @@
 
     <view class="coach-card" wx:for="{{coaches}}" wx:key="id" data-id="{{item.id}}" bindtap="editCoach">
       <view class="coach-card-head">
-        <view class="coach-identity"><view class="coach-list-avatar">{{item.initial}}</view><view><view class="coach-list-name">{{item.coachName}}</view><view class="coach-account">{{item.account}} · {{item.campus || '未设校区'}}</view></view></view>
+        <view class="coach-identity"><view class="coach-list-avatar">{{item.initial}}</view><view><view class="coach-list-name">{{item.coachName}}</view><view class="coach-account">{{item.account}}</view></view></view>
         <text class="status {{item.status === 'disabled' ? 'muted' : item.wechatBound ? '' : 'warn'}}">{{item.status === 'disabled' ? '已停用' : item.bindingText}}</text>
       </view>
       <view class="coach-facts">
         <view><text class="fact-value">{{item.phone || '未登记'}}</text><text class="fact-label">登录手机号</text></view>
-        <view><text class="fact-value">{{item.memberCount}}</text><text class="fact-label">名关联学员</text></view>
       </view>
       <view class="card-actions">
         <text class="edit-link">编辑资料</text>
@@ -39,7 +38,6 @@
       <view class="account-strip"><text>登录账号</text><text>{{form.account}}</text></view>
       <view class="field"><text class="field-label">教练姓名</text><input value="{{form.fullName}}" placeholder="例如：张教练" data-field="fullName" bindinput="input" /></view>
       <view class="field"><text class="field-label">手机号</text><input type="number" maxlength="11" value="{{form.phone}}" placeholder="用于微信手机号验证登录" data-field="phone" bindinput="input" /></view>
-      <view class="field"><text class="field-label">主要校区</text><view class="option-board"><view class="option-block {{form.campus === item ? 'active' : ''}}" wx:for="{{campusOptions}}" wx:key="*this" data-value="{{item}}" bindtap="selectCampus">{{item}}</view></view></view>
       <view class="field" wx:if="{{form.id}}"><text class="field-label">账号状态</text><view class="option-board two"><view class="option-block {{form.status !== 'disabled' ? 'active' : ''}}" data-value="active" bindtap="selectStatus">启用</view><view class="option-block {{form.status === 'disabled' ? 'danger-active' : ''}}" data-value="disabled" bindtap="selectStatus">停用</view></view></view>
       <button class="primary wide-action" loading="{{saving}}" bindtap="saveCoach">保存教练</button>
     </view>

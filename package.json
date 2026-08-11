@@ -1,14 +1,15 @@
 {
   "name": "ye-swim-wx-v1.0",
-  "version": "1.4.3",
+  "version": "2.0.0",
   "private": true,
-  "description": "叶 微信小程序，覆盖管理员、教练、学员预约、出勤与核销闭环。",
+  "description": "叶 微信小程序，专注教练每日码、家长扫码消课和老板课时管理。",
   "scripts": {
     "validate": "node scripts/validate-project.js",
     "test:rules": "node scripts/test-rules.js",
     "test:auth": "node scripts/test-auth.js",
     "test:scanner": "node scripts/test-scanner.js",
     "test:flow": "node scripts/test-flow.js",
+    "test:v2": "node scripts/test-consumption-v2.js",
     "seed:export": "node scripts/export-seed-cloudbase.js",
     "seed:attendance": "node scripts/export-seed-from-attendance-xlsx.js",
     "ci:preview": "node scripts/miniprogram-ci.js preview",

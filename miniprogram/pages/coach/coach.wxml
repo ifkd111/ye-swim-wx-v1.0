@@ -1,37 +1,8 @@
 <view class="page coach-page">
-  <view class="app-header">
-    <view><view class="eyebrow">教练日程</view><view class="title">{{viewer.fullName || viewer.coachName}}</view></view>
-    <view class="scan-action" bindtap="scanVerify">扫码核销</view>
-  </view>
-
-  <view class="date-strip">
-    <view class="date-block {{selectedDate === item.value ? 'active' : ''}}" wx:for="{{dateTabs}}" wx:key="value" bindtap="selectDate" data-date="{{item.value}}"><text>{{item.label}}</text><text class="date-strong">{{item.day}}</text></view>
-  </view>
-
-  <view class="section today-section">
-    <view class="section-head"><view><view class="section-title">{{selectedDateLabel}}课程</view><view class="section-note">到课后直接确认，不用进入其他页面</view></view><text class="text-link" bindtap="goSchedule">全部课表</text></view>
-    <view class="coach-lesson" wx:for="{{daySchedules}}" wx:key="id">
-      <text class="lesson-time">{{item.lessonTime}}</text><view><view class="lesson-title">{{item.memberName}}</view><view class="lesson-meta">{{item.campus}} · 剩余 {{item.remainingLessons === undefined ? '-' : item.remainingLessons}} 课时</view></view>
-      <button wx:if="{{item.canMark}}" class="attendance-button" data-id="{{item.id}}" bindtap="mark">确认到课</button><text wx:else class="status">已完成</text>
-    </view>
-    <view wx:if="{{!daySchedules.length}}" class="calm-empty">当天没有已发布课程</view>
-  </view>
-
-  <view class="section availability-section">
-    <view class="section-head"><view><view class="section-title">我什么时候有空</view><view class="section-note">点亮时间后一次提交，老板会统一安排</view></view><text class="submitted-count">已提交 {{submittedSlots.length}}</text></view>
-    <view class="choice-grid" wx:if="{{campuses.length > 1}}">
-      <view class="choice-tile {{selectedCampus === item ? 'active' : ''}}" wx:for="{{campuses}}" wx:key="*this" bindtap="selectCampus" data-value="{{item}}"><text>{{item}}</text></view>
-    </view>
-    <view class="time-board">
-      <view class="time-block {{item.selected ? 'active' : ''}} {{item.submitted ? 'submitted' : ''}}" wx:for="{{timeOptions}}" wx:key="value" bindtap="toggleTime" data-value="{{item.value}}"><text>{{item.value}}</text><text class="time-state">{{item.submitted ? '已提交' : item.selected ? '已选择' : '有空'}}</text></view>
-    </view>
-    <button wx:if="{{selectedTimes.length}}" class="submit-times" loading="{{submitting}}" bindtap="submitAvailability">提交 {{selectedTimes.length}} 个空闲时间</button>
-  </view>
-
-  <view class="section compact-section"><view class="utility-grid"><view class="utility-tile" bindtap="goSchedule"><text class="utility-strong">课表</text><text>未来课程</text></view><view class="utility-tile" bindtap="goMembers"><text class="utility-strong">学员</text><text>课时信息</text></view></view></view>
-  <view class="utility-row"><text bindtap="logout">退出登录</text></view>
-
-  <view class="modal-mask" wx:if="{{feedbackVisible}}" bindtap="hideFeedback">
-    <view class="modal-card" catchtap="noop"><view class="modal-title">课后反馈</view><view class="modal-meta">点标签即可，也可以补一句</view><view class="chip-list status-filter"><view class="chip {{item.selected ? 'active' : ''}}" wx:for="{{feedbackOptions}}" wx:key="label" data-tag="{{item.label}}" bindtap="toggleFeedbackTag">{{item.label}}</view></view><view class="field"><textarea value="{{feedbackNote}}" placeholder="例如：换气节奏更稳" bindinput="feedbackNoteInput" /></view><view class="toolbar"><button bindtap="hideFeedback">稍后</button><button class="primary" bindtap="submitFeedback">保存</button></view></view>
-  </view>
+  <view class="app-header"><view><view class="eyebrow">今日教练码</view><view class="title">{{code.coachName || viewer.coachName || viewer.fullName}}</view></view><text class="date-label">{{code.codeDate}}</text></view>
+  <view class="qr-card" wx:if="{{code.fileId}}"><image class="daily-code" src="{{code.fileId}}" mode="aspectFit" bindtap="previewCode"></image><view class="qr-title">家长请用微信扫一扫</view><view class="qr-note">今天固定不变，可以截图或转发给家长</view></view>
+  <view class="qr-card" wx:else><view class="qr-title">今日教练码暂未生成</view><view class="qr-note">请稍后重新进入本页；仍失败时联系老板</view></view>
+  <view class="section stats"><view><text>{{stats.todayStudents || 0}}</text><text>今日学员</text></view><view><text>{{stats.todayLessons || 0}}</text><text>今日消课</text></view></view>
+  <view class="section"><view class="section-title">今天的消课</view><view class="log-row" wx:for="{{todayLogs}}" wx:key="id"><view><view class="name">{{item.memberName}}</view><view class="meta">{{item.attendanceTime || '已记录'}}</view></view><text class="lessons">{{item.lessonsDeducted}} 节</text></view><view wx:if="{{!todayLogs.length}}" class="empty">今天还没有学员扫码</view></view>
+  <view class="logout" bindtap="logout">退出登录</view>
 </view>

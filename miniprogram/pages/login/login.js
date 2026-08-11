@@ -23,8 +23,17 @@ Page({
   onLoad() {
     const session = api.currentSession();
     if (session && session.role) {
-      wx.reLaunch({ url: api.homePath(session.role) });
+      this.routeAfterLogin(session);
     }
+  },
+
+  routeAfterLogin(session) {
+    const scene = wx.getStorageSync("pendingCheckinScene");
+    if (scene && session.role === "student") {
+      wx.reLaunch({ url: "/pages/checkin/checkin?scene=" + encodeURIComponent(scene) });
+      return;
+    }
+    wx.reLaunch({ url: api.homePath(session.role) });
   },
 
   onAccountInput(event) {
@@ -54,7 +63,7 @@ Page({
       })
       .then((result) => {
         api.saveSession(result.session);
-        wx.reLaunch({ url: api.homePath(result.session.role) });
+        this.routeAfterLogin(result.session);
       })
       .catch(api.fail)
       .finally(() => this.setData({ loading: false }));
@@ -63,7 +72,7 @@ Page({
   phoneLogin(event) {
     if (this.data.loading) return;
     const phone = rules.normalizePhone(this.data.phone);
-    if (!rules.isChinaMobile(phone)) {
+    if (this.data.useMock && !rules.isChinaMobile(phone)) {
       api.toast("请输入老板登记的 11 位手机号");
       return;
     }
@@ -76,12 +85,12 @@ Page({
     api
       .call("loginByPhone", {
         phoneCode,
-        phone,
+        phone: this.data.useMock ? phone : "",
         openid: "mock-phone-" + phone
       })
       .then((result) => {
         api.saveSession(result.session);
-        wx.reLaunch({ url: api.homePath(result.session.role) });
+        this.routeAfterLogin(result.session);
       })
       .catch(api.fail)
       .finally(() => this.setData({ loading: false }));
@@ -98,7 +107,7 @@ Page({
       })
       .then((result) => {
         api.saveSession(result.session);
-        wx.reLaunch({ url: api.homePath(result.session.role) });
+        this.routeAfterLogin(result.session);
       })
       .catch(api.fail)
       .finally(() => this.setData({ loading: false }));

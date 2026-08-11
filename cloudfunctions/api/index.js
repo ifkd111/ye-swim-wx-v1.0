@@ -393,14 +393,13 @@ async function loginByPhone(payload, wxContext) {
   const currentOpenid = auth.wxOpenid(wxContext);
   if (!currentOpenid) throw new Error("无法识别当前微信，请退出后重试");
   const expectedPhone = rules.normalizePhone(payload.phone);
-  if (!rules.isChinaMobile(expectedPhone)) throw new Error("请输入老板登记的 11 位手机号");
   const phone = await getPhoneNumberFromCode(payload.phoneCode || payload.code);
-  if (!auth.verifiedPhoneMatches(expectedPhone, phone)) {
+  if (!rules.isChinaMobile(phone)) throw new Error("微信没有返回有效手机号，请重新授权");
+  if (expectedPhone && !auth.verifiedPhoneMatches(expectedPhone, phone)) {
     throw new Error("微信授权手机号与输入号码不一致，请使用老板登记的手机号");
   }
   const account = await getAccountByPhone(phone);
   if (!account) throw new Error("该手机号未开通账号，请联系老板绑定");
-  if (account.role === "admin") throw new Error("老板账号请使用账号密码登录");
   if (account.openid && account.openid !== wxContext.OPENID) throw new Error("该手机号账号已经绑定其他微信");
 
   const patch = {
@@ -440,13 +439,12 @@ async function loginForTest(payload) {
 
 async function memberViews(viewer) {
   let memberQuery = {};
-  if (viewer.role === "coach") memberQuery = { coach: viewer.coachName };
   let members;
   let memberKeys = [];
   if (viewer.role === "student") {
-    const member = await findOneByAnyId("members", viewer.memberId);
-    members = member ? [member] : [];
-    memberKeys = rawDocKeys(member, viewer.memberId);
+    const linkedIds = uniqueValues([].concat(viewer.memberIds || [], viewer.memberId || []));
+    members = (await Promise.all(linkedIds.map((id) => findOneByAnyId("members", id)))).filter(Boolean);
+    members.forEach((member) => rawDocKeys(member).forEach((key) => memberKeys.push(key)));
   }
 
   const [loadedMembers, attendanceLogs] = await Promise.all([
@@ -455,7 +453,11 @@ async function memberViews(viewer) {
   ]);
   const usedByMember = {};
   attendanceLogs.forEach((log) => {
-    usedByMember[log.memberId] = (usedByMember[log.memberId] || 0) + Number(log.lessonsDeducted || 0);
+    if (log.status === "reversed" || log.reversedAt) return;
+    const deducted = Number(log.lessonsDeducted);
+    // V1 的月卡历史流水可能记录为 0；V2 统一按实际到课一节保留历史课时。
+    const normalizedLessons = deducted > 0 ? deducted : 1;
+    usedByMember[log.memberId] = (usedByMember[log.memberId] || 0) + normalizedLessons;
   });
 
   return loadedMembers.map((member) => {
@@ -770,8 +772,12 @@ async function productDefaults(payload, current) {
 
 async function memberPayload(payload, current) {
   const raw = payload.member || payload;
-  const product = await productDefaults(raw, current);
-  return Object.assign({}, current || {}, product, {
+  const totalLessons = raw.totalLessons !== undefined && raw.totalLessons !== "" ? Number(raw.totalLessons) : current ? Number(current.totalLessons || 0) : 0;
+  return Object.assign({}, current || {}, {
+    productId: current && current.productId || "",
+    productName: current && current.productName || "",
+    productType: current && current.productType || "",
+    totalLessons: Number.isFinite(totalLessons) ? totalLessons : 0,
     chineseName: String(raw.chineseName || current && current.chineseName || "").trim(),
     phone: String(raw.phone || "").trim(),
     wechat: String(raw.wechat || current && current.wechat || "").trim(),
@@ -790,6 +796,7 @@ async function saveMember(viewer, payload) {
   const current = id ? await findOneByAnyId("members", id) : null;
   const member = await memberPayload(raw, current);
   if (!member.chineseName) throw new Error("学员姓名不能为空");
+  if (!Number.isFinite(Number(member.totalLessons)) || Number(member.totalLessons) < 0 || Number(member.totalLessons) > 99999) throw new Error("总课时应为 0 至 99999");
 
   if (current) {
     delete member._id;
@@ -1487,6 +1494,306 @@ async function rejectCourseApplication(viewer, payload) {
   return { message: "已拒绝课程申请", application: withId(Object.assign({}, application, { status: "rejected" })) };
 }
 
+function todayChina() {
+  return rules.formatDateChina(rules.shanghaiNow());
+}
+
+function timeChina() {
+  const now = rules.shanghaiNow();
+  return String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0");
+}
+
+function linkedMemberIds(account) {
+  return uniqueValues([].concat(account && account.memberIds || [], account && account.memberId || []));
+}
+
+async function nextStudentAccountName(accounts) {
+  const rows = accounts || await list("accounts", {}, 1500);
+  const max = rows.reduce((value, item) => {
+    const match = /^xy(\d+)$/.exec(String(item.account || ""));
+    return match ? Math.max(value, Number(match[1])) : value;
+  }, 0);
+  return "xy" + String(max + 1).padStart(3, "0");
+}
+
+async function bindMemberGuardian(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const member = await findOneByAnyId("members", payload.memberId);
+  if (!member) throw new Error("学员不存在");
+  const phone = rules.normalizePhone(payload.phone || member.phone);
+  if (!rules.isChinaMobile(phone)) throw new Error("请填写家长的 11 位手机号");
+  const accounts = await list("accounts", {}, 1500);
+  const students = accounts.filter((item) => item.role === "student");
+  const oldAccounts = students.filter((item) => linkedMemberIds(item).indexOf(docKey(member)) >= 0 || linkedMemberIds(item).indexOf(member.id) >= 0);
+  let target = students.find((item) => item.phone === phone && item.status !== "disabled") || null;
+  if (!target) {
+    const account = {
+      account: await nextStudentAccountName(accounts),
+      role: "student",
+      fullName: member.chineseName + "家长",
+      phone,
+      memberId: docKey(member),
+      memberIds: [docKey(member)],
+      loginMode: "phone",
+      bindingStatus: "pending",
+      status: "active",
+      openid: null,
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    };
+    const result = await db.collection("accounts").add({ data: account });
+    target = Object.assign({ _id: result._id }, account);
+  } else {
+    const ids = uniqueValues(linkedMemberIds(target).concat(docKey(member)));
+    await db.collection("accounts").doc(docKey(target)).update({ data: { memberId: ids[0], memberIds: ids, updatedAt: nowIso() } });
+    target = Object.assign({}, target, { memberId: ids[0], memberIds: ids });
+  }
+  for (const old of oldAccounts) {
+    if (docKey(old) === docKey(target)) continue;
+    const ids = linkedMemberIds(old).filter((id) => id !== docKey(member) && id !== member.id);
+    await db.collection("accounts").doc(docKey(old)).update({ data: {
+      memberId: ids[0] || "",
+      memberIds: ids,
+      status: ids.length ? old.status || "active" : "disabled",
+      updatedAt: nowIso()
+    } });
+  }
+  await db.collection("members").doc(docKey(member)).update({ data: { phone, updatedAt: nowIso() } });
+  return { message: "家长手机号已绑定", account: safeAccount(target) };
+}
+
+function coachIdentity(viewer) {
+  return {
+    coachAccount: viewer.account,
+    coachName: viewer.coachName || viewer.fullName || (viewer.role === "admin" ? "老板" : viewer.account)
+  };
+}
+
+async function dailyCoachCode(viewer, payload) {
+  assertRole(viewer, ["admin", "coach"]);
+  const date = todayChina();
+  const identity = coachIdentity(viewer);
+  await createCollectionIfNeeded("dailyCoachCodes");
+  let rows = await list("dailyCoachCodes", { coachAccount: identity.coachAccount, codeDate: date }, 1);
+  let code = rows[0] || null;
+  if (!code) {
+    code = {
+      token: crypto.randomBytes(10).toString("hex"),
+      codeDate: date,
+      coachAccount: identity.coachAccount,
+      coachName: identity.coachName,
+      status: "active",
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    };
+    const result = await db.collection("dailyCoachCodes").add({ data: code });
+    code._id = result._id;
+  }
+  const envVersion = ["develop", "trial", "release"].indexOf(payload.envVersion) >= 0 ? payload.envVersion : "release";
+  const storedFiles = Object.assign({}, code.fileIds || {});
+  if (!storedFiles[envVersion]) {
+    const image = await cloud.openapi.wxacode.getUnlimited({
+      scene: "t=" + code.token,
+      page: "pages/checkin/checkin",
+      checkPath: false,
+      envVersion,
+      width: 430
+    });
+    const upload = await cloud.uploadFile({
+      cloudPath: "daily-coach-codes/" + date + "/" + identity.coachAccount + "-" + envVersion + ".jpg",
+      fileContent: image.buffer
+    });
+    storedFiles[envVersion] = upload.fileID;
+    await db.collection("dailyCoachCodes").doc(docKey(code)).update({ data: { fileIds: storedFiles, updatedAt: nowIso() } });
+  }
+  return { codeDate: date, coachAccount: identity.coachAccount, coachName: identity.coachName, fileId: storedFiles[envVersion], envVersion };
+}
+
+async function findDailyCode(scene) {
+  const value = String(scene || "").trim();
+  const token = value.indexOf("t=") === 0 ? value.slice(2) : value;
+  if (!token) return null;
+  return (await list("dailyCoachCodes", { token, status: "active" }, 1))[0] || null;
+}
+
+async function checkinContext(viewer, payload) {
+  assertRole(viewer, ["student"]);
+  const code = await findDailyCode(payload.scene || payload.token);
+  if (!code) throw new Error("教练码无效");
+  if (code.codeDate !== todayChina()) throw new Error("该教练码已过期，请扫描今天的新码");
+  const coach = await getAccountByName(code.coachAccount);
+  if (!coach || ["admin", "coach"].indexOf(coach.role) < 0) throw new Error("该教练已停用");
+  const ids = linkedMemberIds(viewer);
+  const members = (await Promise.all(ids.map((id) => findOneByAnyId("members", id)))).filter(Boolean);
+  if (!members.length) throw new Error("当前手机号没有绑定学员，请联系老板");
+  const decorated = await memberViews(viewer);
+  return {
+    codeDate: code.codeDate,
+    coachAccount: code.coachAccount,
+    coachName: code.coachName,
+    confirmTime: timeChina(),
+    members: decorated
+  };
+}
+
+async function consumptionLogsForMember(memberId) {
+  return list("attendanceLogs", { memberId }, 1500);
+}
+
+async function confirmDailyCheckin(viewer, payload) {
+  assertRole(viewer, ["student"]);
+  const context = await checkinContext(viewer, payload);
+  const lessons = Number(payload.lessons || 1);
+  if ([1, 2, 3].indexOf(lessons) < 0) throw new Error("家长每次只能选择扣 1、2 或 3 节");
+  const allowedIds = context.members.map((item) => item.id);
+  const memberIds = uniqueValues(payload.memberIds || []).filter((id) => allowedIds.indexOf(id) >= 0);
+  if (!memberIds.length) throw new Error("请至少选择一名到场学员");
+  const requestId = String(payload.requestId || crypto.randomBytes(8).toString("hex")).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
+  const batchId = "scan-" + requestId;
+  const previous = await list("attendanceLogs", { batchId }, 10);
+  if (previous.length) {
+    const refreshed = await memberViews(viewer);
+    return { message: "消课成功", batchId, logs: previous.map(withId), members: refreshed, confirmedAt: previous[0].createdAt || nowIso(), idempotent: true };
+  }
+  const date = todayChina();
+  const duplicateNames = [];
+  for (const memberId of memberIds) {
+    const logs = await consumptionLogsForMember(memberId);
+    const duplicated = logs.some((log) => log.attendanceDate === date && log.coachAccount === context.coachAccount && log.source === "coach_daily_qr" && log.status !== "reversed" && !log.reversedAt);
+    if (duplicated) duplicateNames.push((context.members.find((item) => item.id === memberId) || {}).chineseName || memberId);
+  }
+  if (duplicateNames.length) throw new Error(duplicateNames.join("、") + " 今天已在该教练处消课");
+  const createdAt = nowIso();
+  const results = [];
+  for (const memberId of memberIds) {
+    const member = context.members.find((item) => item.id === memberId);
+    const logId = batchId + "-" + crypto.createHash("md5").update(memberId).digest("hex").slice(0, 8);
+    const log = {
+      batchId,
+      attendanceDate: date,
+      attendanceTime: timeChina(),
+      memberId,
+      memberName: member.chineseName,
+      coachAccount: context.coachAccount,
+      coach: context.coachName,
+      lessonsDeducted: lessons,
+      source: "coach_daily_qr",
+      sourceNote: "家长扫码消课",
+      status: "active",
+      createdBy: viewer.account,
+      createdAt,
+      updatedAt: createdAt
+    };
+    await db.collection("attendanceLogs").doc(logId).set({ data: log });
+    results.push(Object.assign({ id: logId }, log));
+  }
+  const refreshed = await memberViews(viewer);
+  return { message: "消课成功", batchId, logs: results, members: refreshed, confirmedAt: createdAt };
+}
+
+async function consumptionHomeData(viewer) {
+  const members = await memberViews(viewer);
+  let logs = await list("attendanceLogs", {}, 2000);
+  if (viewer.role === "coach") logs = logs.filter((item) => item.coachAccount === viewer.account || (!item.coachAccount && item.coach === viewer.coachName));
+  if (viewer.role === "student") {
+    const ids = members.map((item) => item.id);
+    logs = logs.filter((item) => ids.indexOf(item.memberId) >= 0);
+  }
+  logs = logs.map((item) => {
+    const row = withId(item);
+    if (row.status !== "reversed" && !row.reversedAt && Number(row.lessonsDeducted) <= 0) row.lessonsDeducted = 1;
+    return row;
+  }).sort((a, b) => String(b.createdAt || b.attendanceDate || "").localeCompare(String(a.createdAt || a.attendanceDate || "")));
+  const today = todayChina();
+  const todayLogs = logs.filter((item) => item.attendanceDate === today && item.status !== "reversed" && !item.reversedAt);
+  const accounts = viewer.role === "admin" ? (await list("accounts", {}, 1500)).map(safeAccount) : [];
+  return {
+    viewer: safeAccount(viewer),
+    members,
+    logs: logs.slice(0, viewer.role === "admin" ? 500 : 100),
+    todayLogs,
+    accounts,
+    stats: {
+      todayStudents: uniqueValues(todayLogs.map((item) => item.memberId)).length,
+      todayLessons: todayLogs.reduce((sum, item) => sum + Number(item.lessonsDeducted || 0), 0),
+      debtMembers: members.filter((item) => Number(item.remainingLessons) < 0).length
+    }
+  };
+}
+
+async function reverseConsumption(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const log = await findOneByAnyId("attendanceLogs", payload.logId);
+  if (!log) throw new Error("消课流水不存在");
+  if (log.status === "reversed" || log.reversedAt) throw new Error("该流水已经撤销");
+  const patch = { status: "reversed", reversedAt: nowIso(), reversedBy: viewer.account, reverseReason: String(payload.reason || "老板纠错").trim(), updatedAt: nowIso() };
+  await db.collection("attendanceLogs").doc(docKey(log)).update({ data: patch });
+  await db.collection("auditLogs").add({ data: { action: "reverse_consumption", logId: docKey(log), memberId: log.memberId, beforeLessons: Number(log.lessonsDeducted || 1), reason: patch.reverseReason, operator: viewer.account, createdAt: patch.reversedAt } });
+  return { message: "已撤销并返还课时", log: withId(Object.assign({}, log, patch)) };
+}
+
+async function adjustConsumption(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const log = await findOneByAnyId("attendanceLogs", payload.logId);
+  if (!log) throw new Error("消课流水不存在");
+  if (log.status === "reversed" || log.reversedAt) throw new Error("已撤销流水不能修改");
+  const lessons = Math.floor(Number(payload.lessons));
+  if (lessons < 1 || lessons > 99) throw new Error("课时应为 1 至 99 的整数");
+  const patch = { lessonsDeducted: lessons, correctedFrom: Number(log.lessonsDeducted || 0), correctedAt: nowIso(), correctedBy: viewer.account, correctionReason: String(payload.reason || "老板调整").trim(), updatedAt: nowIso() };
+  await db.collection("attendanceLogs").doc(docKey(log)).update({ data: patch });
+  await db.collection("auditLogs").add({ data: { action: "adjust_consumption", logId: docKey(log), memberId: log.memberId, beforeLessons: patch.correctedFrom, afterLessons: lessons, reason: patch.correctionReason, operator: viewer.account, createdAt: patch.correctedAt } });
+  return { message: "消课课时已调整", log: withId(Object.assign({}, log, patch)) };
+}
+
+async function manualConsumption(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const lessons = Math.floor(Number(payload.lessons || 1));
+  if (lessons < 1 || lessons > 99) throw new Error("课时应为 1 至 99 的整数");
+  const memberIds = uniqueValues(payload.memberIds || []);
+  if (!memberIds.length) throw new Error("请选择学员");
+  const coachAccount = String(payload.coachAccount || viewer.account);
+  const coach = await getAccountByName(coachAccount);
+  if (!coach || ["admin", "coach"].indexOf(coach.role) < 0) throw new Error("教练不存在");
+  const batchId = "manual-" + crypto.randomBytes(8).toString("hex");
+  for (const memberId of memberIds) {
+    const member = await findOneByAnyId("members", memberId);
+    if (!member) throw new Error("学员不存在");
+    await db.collection("attendanceLogs").add({ data: {
+      batchId,
+      attendanceDate: String(payload.attendanceDate || todayChina()),
+      attendanceTime: String(payload.attendanceTime || timeChina()),
+      memberId: docKey(member),
+      memberName: member.chineseName,
+      coachAccount,
+      coach: coach.coachName || coach.fullName || coach.account,
+      lessonsDeducted: lessons,
+      source: "admin_manual",
+      sourceNote: String(payload.reason || "老板补录").trim(),
+      status: "active",
+      createdBy: viewer.account,
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    } });
+  }
+  await db.collection("auditLogs").add({ data: { action: "manual_consumption", batchId, memberIds, coachAccount, lessons, reason: String(payload.reason || "老板补录").trim(), operator: viewer.account, createdAt: nowIso() } });
+  return { message: "补录消课成功", batchId };
+}
+
+async function addMemberLessons(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const member = await findOneByAnyId("members", payload.memberId);
+  if (!member) throw new Error("学员不存在");
+  const amount = Math.floor(Number(payload.amount));
+  if (!amount || Math.abs(amount) > 999) throw new Error("调整课时应为 -999 至 999 的非零整数");
+  const before = Number(member.totalLessons || 0);
+  const after = before + amount;
+  if (after < 0) throw new Error("总课时不能小于 0");
+  await db.collection("members").doc(docKey(member)).update({ data: { totalLessons: after, updatedAt: nowIso() } });
+  await createCollectionIfNeeded("lessonAdjustments");
+  await db.collection("lessonAdjustments").add({ data: { memberId: docKey(member), memberName: member.chineseName, before, amount, after, reason: String(payload.reason || "老板加课").trim(), operator: viewer.account, createdAt: nowIso() } });
+  return { message: "学员总课时已更新", before, amount, after };
+}
+
 exports.main = async (event) => {
   try {
     const wxContext = cloud.getWXContext();
@@ -1505,6 +1812,15 @@ exports.main = async (event) => {
 
     const actions = {
       getHomeData,
+      consumptionHomeData,
+      dailyCoachCode,
+      checkinContext,
+      confirmDailyCheckin,
+      bindMemberGuardian,
+      reverseConsumption,
+      adjustConsumption,
+      manualConsumption,
+      addMemberLessons,
       listPagedData,
       saveMember,
       bulkImportMembers,

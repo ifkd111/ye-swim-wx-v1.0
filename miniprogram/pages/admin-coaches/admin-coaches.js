@@ -15,7 +15,7 @@ function emptyForm(account) {
     account: account || "jl001",
     fullName: "",
     phone: "",
-    campus: "绿洲",
+    campus: "",
     coachName: "",
     status: "active"
   };
@@ -26,11 +26,9 @@ Page({
     viewMode: "list",
     accounts: [],
     coaches: [],
-    members: [],
     keyword: "",
     filter: "all",
     filterStats: { all: 0, active: 0, pending: 0, disabled: 0 },
-    campusOptions: ["绿洲", "古北"],
     form: emptyForm("jl001"),
     saving: false
   },
@@ -41,14 +39,9 @@ Page({
   },
 
   load() {
-    api.call("getHomeData").then((data) => {
+    api.call("consumptionHomeData").then((data) => {
       const accounts = data.accounts || [];
-      const members = data.members || [];
-      const campusOptions = Array.from(new Set(["绿洲", "古北"].concat(
-        accounts.map((item) => item.campus),
-        members.map((item) => item.campus)
-      ).filter(Boolean)));
-      this.setData({ accounts, members, campusOptions }, () => this.applyFilter());
+      this.setData({ accounts }, () => this.applyFilter());
     }).catch(api.fail);
   },
 
@@ -56,11 +49,9 @@ Page({
     const keyword = String(this.data.keyword || "").trim().toLowerCase();
     const all = (this.data.accounts || []).filter((item) => item.role === "coach").map((item) => {
       const coachName = item.coachName || item.fullName || item.account;
-      const memberCount = (this.data.members || []).filter((member) => member.coach === coachName).length;
       return Object.assign({}, item, {
         coachName,
         initial: coachName.slice(0, 1),
-        memberCount,
         bindingText: item.wechatBound ? "微信已绑定" : "待首次登录"
       });
     });
@@ -75,7 +66,7 @@ Page({
       if (this.data.filter === "pending" && (item.status === "disabled" || item.wechatBound)) return false;
       if (this.data.filter === "disabled" && item.status !== "disabled") return false;
       if (!keyword) return true;
-      return [item.coachName, item.fullName, item.phone, item.campus, item.account]
+      return [item.coachName, item.fullName, item.phone, item.account]
         .some((value) => String(value || "").toLowerCase().indexOf(keyword) >= 0);
     });
     this.setData({ coaches, filterStats });
@@ -107,7 +98,7 @@ Page({
         account: coach.account || "",
         fullName: coach.fullName || coach.coachName || "",
         phone: coach.phone || "",
-        campus: coach.campus || "绿洲",
+        campus: "",
         coachName: coach.coachName || coach.fullName || "",
         status: coach.status || "active"
       }
@@ -127,10 +118,6 @@ Page({
     this.setData(patch);
   },
 
-  selectCampus(event) {
-    this.setData({ "form.campus": event.currentTarget.dataset.value });
-  },
-
   selectStatus(event) {
     this.setData({ "form.status": event.currentTarget.dataset.value });
   },
@@ -140,7 +127,6 @@ Page({
     const form = this.data.form;
     if (!String(form.fullName || "").trim()) return api.toast("请填写教练姓名");
     if (!rules.isChinaMobile(form.phone)) return api.toast("请填写 11 位教练手机号");
-    if (!String(form.campus || "").trim()) return api.toast("请选择校区");
     this.setData({ saving: true });
     api.syncing("正在保存教练");
     api.call("saveAccount", { account: form }).then((result) => {

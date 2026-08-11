@@ -5,6 +5,25 @@
   "miniprogramRoot": "miniprogram/",
   "cloudfunctionRoot": "cloudfunctions/",
   "compileType": "miniprogram",
+  "packOptions": {
+    "ignore": [
+      { "type": "folder", "value": "pages/admin-availability" },
+      { "type": "folder", "value": "pages/admin-bookings" },
+      { "type": "folder", "value": "pages/admin-course-applications" },
+      { "type": "folder", "value": "pages/admin-import" },
+      { "type": "folder", "value": "pages/admin-leave" },
+      { "type": "folder", "value": "pages/admin-schedule" },
+      { "type": "folder", "value": "pages/admin-staff" },
+      { "type": "folder", "value": "pages/coach-availability" },
+      { "type": "folder", "value": "pages/coach-members" },
+      { "type": "folder", "value": "pages/coach-schedule" },
+      { "type": "folder", "value": "pages/student-booking" },
+      { "type": "folder", "value": "pages/student-records" },
+      { "type": "file", "value": "utils/scanner.js" },
+      { "type": "file", "value": "utils/qrcode.js" },
+      { "type": "file", "value": "utils/subscribe.js" }
+    ]
+  },
   "setting": {
     "urlCheck": false,
     "es6": true,

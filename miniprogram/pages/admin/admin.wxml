@@ -1,76 +1,10 @@
 <view class="page admin-page">
-  <view class="app-header">
-    <view><view class="eyebrow">老板工作台</view><view class="title">今天要处理的</view></view>
-    <view class="header-action" bindtap="go" data-url="/pages/admin-coaches/admin-coaches">教练 {{coachCount}}</view>
-  </view>
-
-  <view class="date-strip">
-    <view class="date-block {{selectedDate === item.value ? 'active' : ''}}" wx:for="{{dateTabs}}" wx:key="value" bindtap="selectDate" data-date="{{item.value}}"><text>{{item.label}}</text><text class="date-strong">{{item.day}}</text></view>
-  </view>
-
-  <view class="supply-summary">
-    <view><text class="summary-number">{{coachSupply.length}}</text><text class="summary-label">教练有空</text></view>
-    <view class="summary-arrow">→</view>
-    <view><text class="summary-number">{{demandMembers.length}}</text><text class="summary-label">学员想上课</text></view>
-    <view class="summary-arrow">→</view>
-    <view><text class="summary-number accent">{{courseDrafts.length}}</text><text class="summary-label">课程草稿</text></view>
-  </view>
-
-  <view class="section draft-section">
-    <view class="section-head">
-      <view><view class="section-title">自动匹配草稿</view><view class="section-note">{{selectedDateLabel}} · 发布后才进入正式课表</view></view>
-      <button wx:if="{{courseDrafts.length}}" class="small-primary" loading="{{publishingAll}}" bindtap="publishAllDrafts">全部发布</button>
-    </view>
-    <view wx:if="{{courseDrafts.length}}" class="draft-list">
-      <view class="match-card" wx:for="{{courseDrafts}}" wx:key="id">
-        <view class="match-time">{{item.slotTime}}</view>
-        <view class="match-main"><view class="match-title">{{item.memberName}} · {{item.productName || '游泳课'}}</view><view class="match-meta">{{item.campus}} · {{item.coach}} · 余 {{item.remainingLessons === undefined ? '-' : item.remainingLessons}} 课时</view></view>
-        <view class="match-actions"><button class="publish-button" loading="{{approvalBusy === item.id}}" data-id="{{item.id}}" bindtap="approveDraft">发布</button><text data-id="{{item.id}}" bindtap="openAdjustment">调整</text><text class="reject-link" data-id="{{item.id}}" bindtap="rejectDraft">不排</text></view>
-      </view>
-    </view>
-    <view wx:else class="calm-empty">这一天还没有学员提交上课意向</view>
-  </view>
-
-  <view class="section">
-    <view class="section-head"><view><view class="section-title">空闲教练</view><view class="section-note">教练提交后，老板决定是否开放给学员</view></view><text class="text-link" bindtap="go" data-url="/pages/admin-availability/admin-availability">每周模板</text></view>
-    <view class="coach-grid" wx:if="{{coachSupply.length}}">
-      <view class="coach-tile" wx:for="{{coachSupply}}" wx:key="coach">
-        <view class="coach-avatar">{{item.initial}}</view><view class="coach-name">{{item.coach}}</view><view class="coach-meta">{{item.campus}} · {{item.times.length}} 个时间</view><view class="coach-times">{{item.timeText}}</view>
-        <button wx:if="{{item.draftCount}}" class="open-button" data-coach="{{item.coach}}" bindtap="publishCoachSlots">开放给学员</button><text wx:else class="opened-label">已开放</text>
-      </view>
-    </view>
-    <view wx:else class="calm-empty">暂无教练空闲时间</view>
-  </view>
-
-  <view class="section">
-    <view class="section-head"><view><view class="section-title">已发布课程</view><view class="section-note">{{selectedDateLabel}}共 {{daySchedules.length}} 节</view></view><text class="text-link" bindtap="go" data-url="/pages/admin-schedule/admin-schedule?filter=today">完整课表</text></view>
-    <view class="schedule-row" wx:for="{{daySchedules}}" wx:key="id"><text class="schedule-time">{{item.lessonTime}}</text><view><view class="schedule-title">{{item.memberName}}</view><view class="schedule-meta">{{item.campus}} · {{item.coach}}</view></view><text class="status {{item.lessonStatus === 'completed' ? '' : 'warn'}}">{{item.lessonStatus === 'completed' ? '完成' : '待上课'}}</text></view>
-    <view wx:if="{{!daySchedules.length}}" class="calm-empty">当天还没有正式课程</view>
-  </view>
-
-  <view class="section compact-section">
-    <view class="section-title">其他事项</view>
-    <view class="utility-grid">
-      <view class="utility-tile" bindtap="go" data-url="/pages/admin-leave/admin-leave"><text class="utility-strong">{{pendingLeaves}}</text><text>请假补课</text></view>
-      <view class="utility-tile" bindtap="go" data-url="/pages/admin-course-applications/admin-course-applications"><text class="utility-strong">{{pendingApplications}}</text><text>续课申请</text></view>
-      <view class="utility-tile" bindtap="go" data-url="/pages/admin-coaches/admin-coaches"><text class="utility-strong">{{coachCount}} 位</text><text>教练与登录</text></view>
-      <view class="utility-tile" bindtap="go" data-url="/pages/admin-members/admin-members"><text class="utility-strong">{{memberCount}} 位</text><text>学员与课时</text></view>
-      <view class="utility-tile" bindtap="go" data-url="/pages/admin-availability/admin-availability"><text class="utility-strong">排课</text><text>固定模板与临时调整</text></view>
-      <view class="utility-tile" bindtap="go" data-url="/pages/admin-staff/admin-staff"><text class="utility-strong">账号</text><text>高级账号管理</text></view>
-    </view>
-  </view>
-
-  <view class="utility-row"><text bindtap="changePassword">修改密码</text><text bindtap="logout">退出登录</text></view>
-
-  <view class="modal-mask" wx:if="{{adjustmentVisible}}" bindtap="closeAdjustment">
-    <view class="modal-card adjustment-modal" catchtap="noop">
-      <view class="modal-title">调整 {{adjustingDraft.memberName}} 的课程</view>
-      <view class="modal-meta">直接选择其他教练时间</view>
-      <view class="adjustment-list">
-        <view class="adjustment-tile {{selectedAdjustmentSlotId === item.id ? 'active' : ''}}" wx:for="{{adjustmentSlots}}" wx:key="id" data-id="{{item.id}}" bindtap="selectAdjustmentSlot"><view class="adjustment-time">{{item.slotTime}}</view><view class="adjustment-meta">{{item.coach}} · {{item.campus}} · 余 {{item.id === adjustingDraft.slotId ? (item.left + 1) : item.left}}</view></view>
-      </view>
-      <view wx:if="{{!adjustmentSlots.length}}" class="calm-empty">没有其他可用时间</view>
-      <view class="modal-actions"><button bindtap="closeAdjustment">取消</button><button class="primary" bindtap="saveAdjustment">保存调整</button></view>
-    </view>
-  </view>
+  <view class="app-header"><view><view class="eyebrow">今日消课</view><view class="title">{{viewer.fullName || '老板'}}</view></view><view class="my-code" bindtap="previewCode">我的今日教练码</view></view>
+  <view class="owner-code-card" wx:if="{{code.fileId}}" bindtap="previewCode"><image src="{{code.fileId}}" mode="aspectFit"></image><view><view class="owner-code-title">我的今日教练码</view><view class="owner-code-note">老板带课时，让家长直接扫码 · 点击放大</view></view><text>›</text></view>
+  <view class="owner-code-card code-error" wx:else><view><view class="owner-code-title">今日教练码暂未生成</view><view class="owner-code-note">下拉刷新后重试</view></view></view>
+  <view class="stats"><view><text>{{stats.todayStudents || 0}}</text><text>今日学员</text></view><view><text>{{stats.todayLessons || 0}}</text><text>今日消课</text></view><view class="{{stats.debtMembers ? 'danger' : ''}}"><text>{{stats.debtMembers || 0}}</text><text>欠课学员</text></view></view>
+  <view class="quick-actions"><view bindtap="goCoaches"><text>教练</text><text>人员与每日码</text></view><view bindtap="goMembers"><text>学员课时</text><text>绑定家长与加课</text></view><view bindtap="openManual"><text>补录消课</text><text>漏扫或少扣时使用</text></view></view>
+  <view class="section"><view class="section-head"><view><view class="section-title">今天的流水</view><view class="section-note">点击记录可以修改或撤销</view></view></view><view class="log-row" wx:for="{{todayLogs}}" wx:key="id" data-id="{{item.id}}" bindtap="manageLog"><view class="log-time">{{item.attendanceTime || '--:--'}}</view><view class="log-main"><view class="log-name">{{item.coach}} · {{item.memberName}}</view><view class="meta">{{item.source === 'admin_manual' ? '老板补录' : '家长扫码'}}</view></view><text class="lessons">{{item.lessonsDeducted}} 节 ›</text></view><view wx:if="{{!todayLogs.length}}" class="empty">今天还没有消课记录</view></view>
+  <view class="logout" bindtap="logout">退出登录</view>
+  <view class="modal-mask" wx:if="{{manualVisible}}" bindtap="closeManual"><view class="modal-card manual-card" catchtap="noop"><view class="modal-title">补录消课</view><view class="field-label">教练</view><view class="chips"><view class="chip {{selectedCoach === item.account ? 'active' : ''}}" wx:for="{{accounts}}" wx:key="account" data-account="{{item.account}}" bindtap="selectCoach">{{item.coachName || item.fullName}}</view></view><view class="field-label">学员</view><view class="chips"><view class="chip {{item.selected ? 'active' : ''}}" wx:for="{{manualMembers}}" wx:key="id" data-id="{{item.id}}" bindtap="toggleManualMember">{{item.chineseName}}</view></view><view class="field-label">每人扣除</view><view class="chips"><view class="chip {{manualLessons === item ? 'active' : ''}}" wx:for="{{lessonOptions}}" wx:key="*this" data-value="{{item}}" bindtap="selectManualLessons">{{item}} 节</view></view><view class="field"><text class="field-label">其他课时数</text><input type="number" value="{{manualLessons}}" placeholder="可输入 1 至 99" data-field="manualLessons" bindinput="manualInput" /></view><view class="field"><text class="field-label">日期</text><input value="{{manualDate}}" data-field="manualDate" bindinput="manualInput" /></view><view class="field"><text class="field-label">时间</text><input value="{{manualTime}}" data-field="manualTime" bindinput="manualInput" /></view><view class="field"><text class="field-label">补录原因</text><input value="{{manualReason}}" data-field="manualReason" bindinput="manualInput" /></view><button class="primary wide-action" loading="{{saving}}" bindtap="submitManual">确认补录</button></view></view>
 </view>
