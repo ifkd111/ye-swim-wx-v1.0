@@ -1,6 +1,7 @@
 const api = require("../../utils/api");
 const env = require("../../env");
 const runtime = require("../../utils/runtime");
+const rules = require("../../utils/rules");
 
 const developerMock = runtime.developerMockEnabled();
 const useMock = runtime.useMock();
@@ -61,6 +62,11 @@ Page({
 
   phoneLogin(event) {
     if (this.data.loading) return;
+    const phone = rules.normalizePhone(this.data.phone);
+    if (!rules.isChinaMobile(phone)) {
+      api.toast("请输入老板登记的 11 位手机号");
+      return;
+    }
     const phoneCode = event && event.detail && event.detail.code;
     if (!this.data.useMock && !phoneCode) {
       api.toast("需要授权手机号后才能登录");
@@ -70,8 +76,8 @@ Page({
     api
       .call("loginByPhone", {
         phoneCode,
-        phone: this.data.phone,
-        openid: "mock-phone-" + this.data.phone
+        phone,
+        openid: "mock-phone-" + phone
       })
       .then((result) => {
         api.saveSession(result.session);

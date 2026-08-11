@@ -26,10 +26,17 @@ function safeEqual(left, right) {
   return first.length === second.length && crypto.timingSafeEqual(first, second);
 }
 
+function verifiedPhoneMatches(expectedPhone, verifiedPhone) {
+  const expected = String(expectedPhone || "").replace(/\D/g, "").slice(0, 11);
+  const verified = String(verifiedPhone || "").replace(/\D/g, "").slice(0, 11);
+  return /^1[3-9]\d{9}$/.test(expected) && expected === verified;
+}
+
 module.exports = {
   envFlag,
   wxOpenid,
   isWechatSessionBound,
   canBindWechat,
-  safeEqual
+  safeEqual,
+  verifiedPhoneMatches
 };

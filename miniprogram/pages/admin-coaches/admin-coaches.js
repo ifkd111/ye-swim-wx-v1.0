@@ -61,7 +61,7 @@ Page({
         coachName,
         initial: coachName.slice(0, 1),
         memberCount,
-        bindingText: item.wechatBound ? "微信已绑定" : "等待手机号验证"
+        bindingText: item.wechatBound ? "微信已绑定" : "待首次登录"
       });
     });
     const filterStats = {

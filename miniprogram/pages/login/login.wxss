@@ -81,6 +81,28 @@
   text-align: center;
 }
 
+.identity-guide {
+  display: flex;
+  flex-direction: column;
+  gap: 8rpx;
+  margin-bottom: 22rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 18rpx;
+  background: #edf6ff;
+}
+
+.identity-guide-title {
+  color: #173d6d;
+  font-size: 28rpx;
+  font-weight: 800;
+}
+
+.identity-guide-text {
+  color: #5d7292;
+  font-size: 24rpx;
+  line-height: 1.5;
+}
+
 .test-panel {
   margin-top: 18rpx;
 }

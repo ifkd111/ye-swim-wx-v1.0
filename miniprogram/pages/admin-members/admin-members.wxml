@@ -36,11 +36,11 @@
   </block>
 
   <block wx:else>
-    <view class="form-header"><text bindtap="closeForm">‹ 返回学员列表</text><view class="title">{{form.id ? '编辑学员' : '新增学员'}}</view><view class="subtitle">填写手机号会同时开通或更新微信登录</view></view>
+    <view class="form-header"><text bindtap="closeForm">‹ 返回学员列表</text><view class="title">{{form.id ? '编辑学员' : '新增学员'}}</view><view class="subtitle">老板绑定手机号后，学员输入此号码即可验证进入学员端</view></view>
     <view class="section member-form">
       <view class="form-grid">
         <view class="field"><text class="field-label">姓名</text><input value="{{form.chineseName}}" placeholder="学员姓名" data-field="chineseName" bindinput="input" /></view>
-        <view class="field"><text class="field-label">手机号</text><input type="number" maxlength="11" value="{{form.phone}}" placeholder="不填则仅保存资料" data-field="phone" bindinput="input" /></view>
+        <view class="field"><text class="field-label">登录手机号</text><input type="number" maxlength="11" value="{{form.phone}}" placeholder="必填，用于学员验证登录" data-field="phone" bindinput="input" /></view>
       </view>
       <view class="field"><text class="field-label">上课地点</text><view class="option-board"><view class="option-block {{form.campus === item ? 'active' : ''}}" wx:for="{{campusOptions}}" wx:key="*this" data-value="{{item}}" bindtap="selectCampus">{{item}}</view></view></view>
       <view class="field"><text class="field-label">教练</text><view class="option-board"><view class="option-block {{form.coach === item ? 'active' : ''}}" wx:for="{{coachOptions}}" wx:key="*this" data-value="{{item}}" bindtap="selectCoach">{{item}}</view></view><view wx:if="{{!coachOptions.length}}" class="inline-warning">请先在老板首页添加教练</view></view>

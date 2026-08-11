@@ -392,7 +392,12 @@ async function login(payload, wxContext) {
 async function loginByPhone(payload, wxContext) {
   const currentOpenid = auth.wxOpenid(wxContext);
   if (!currentOpenid) throw new Error("无法识别当前微信，请退出后重试");
+  const expectedPhone = rules.normalizePhone(payload.phone);
+  if (!rules.isChinaMobile(expectedPhone)) throw new Error("请输入老板登记的 11 位手机号");
   const phone = await getPhoneNumberFromCode(payload.phoneCode || payload.code);
+  if (!auth.verifiedPhoneMatches(expectedPhone, phone)) {
+    throw new Error("微信授权手机号与输入号码不一致，请使用老板登记的手机号");
+  }
   const account = await getAccountByPhone(phone);
   if (!account) throw new Error("该手机号未开通账号，请联系老板绑定");
   if (account.role === "admin") throw new Error("老板账号请使用账号密码登录");

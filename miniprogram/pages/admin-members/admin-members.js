@@ -84,7 +84,7 @@ Page({
     const progressPercent = total > 0 ? Math.min(100, Math.max(0, Math.round(used / total * 100))) : 0;
     return Object.assign({}, member, {
       progressPercent,
-      loginText: account ? (account.wechatBound ? "微信已绑定" : "等待手机号验证") : (member.phone ? "登录账号待创建" : "未开通登录"),
+      loginText: account ? (account.wechatBound ? "微信已绑定" : "待首次登录") : (member.phone ? "登录账号待创建" : "未绑定手机号"),
       loginTone: account && account.wechatBound ? "" : "warn"
     });
   },
@@ -185,7 +185,7 @@ Page({
 
   syncStudentAccount(member) {
     const phone = rules.normalizePhone(this.data.form.phone);
-    if (!phone) return Promise.resolve({ message: "仅保存课程资料，暂未开通登录" });
+    if (!phone) return Promise.reject(new Error("请先绑定学员手机号"));
     const current = this.data.linkedAccount || this.accountForMember(member);
     const account = {
       id: current && current.id || "",
@@ -204,7 +204,7 @@ Page({
     if (this.data.saving) return;
     const form = this.data.form;
     if (!String(form.chineseName || "").trim()) return api.toast("请填写学员姓名");
-    if (form.phone && !rules.isChinaMobile(form.phone)) return api.toast("手机号应为 11 位大陆手机号");
+    if (!rules.isChinaMobile(form.phone)) return api.toast("请绑定学员的 11 位手机号");
     if (!form.campus) return api.toast("请选择上课地点");
     if (!form.coach) return api.toast("请选择教练");
     if (this.data.linkedAccount && !form.phone) return api.toast("已开通登录的学员不能清空手机号");
@@ -215,7 +215,7 @@ Page({
       savedMember = result.member;
       return this.syncStudentAccount(result.member);
     }).then(() => {
-      api.done(form.phone ? "学员与登录已保存" : "学员资料已保存");
+      api.done("学员与登录已保存");
       this.setData({ viewMode: "list", linkedAccount: null });
       this.load();
     }).catch((error) => {

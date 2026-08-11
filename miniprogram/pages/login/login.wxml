@@ -7,7 +7,7 @@
       </view>
     </view>
     <view class="title">叶</view>
-    <view class="subtitle">教练和学员用手机号验证进入，老板可用账号密码管理。</view>
+    <view class="subtitle">老板登记身份，教练和学员用自己的手机号进入对应首页。</view>
 
     <view class="login-tabs">
       <view class="chip {{mode === 'phone' ? 'active' : ''}}" bindtap="setMode" data-mode="phone">手机号登录</view>
@@ -15,9 +15,13 @@
     </view>
 
     <view wx:if="{{mode === 'phone'}}">
-      <view class="field" wx:if="{{useMock || testLogin.enabled}}">
-        <text class="field-label">测试手机号</text>
-        <input value="{{phone}}" type="number" maxlength="11" placeholder="输入测试手机号" bindinput="onPhoneInput" />
+      <view class="identity-guide">
+        <text class="identity-guide-title">输入老板登记的手机号</text>
+        <text class="identity-guide-text">系统会自动识别你的身份，无需选择教练或学员。</text>
+      </view>
+      <view class="field">
+        <text class="field-label">手机号</text>
+        <input value="{{phone}}" type="number" maxlength="11" placeholder="请输入 11 位手机号" bindinput="onPhoneInput" />
       </view>
       <view class="test-panel" wx:if="{{testLogin.enabled}}">
         <view class="login-tip">仅微信开发者工具可用 · {{phone}} · 选择角色直接体验</view>
@@ -27,9 +31,9 @@
           <button class="mini" loading="{{loading}}" data-role="student" bindtap="testLogin">学员</button>
         </view>
       </view>
-      <button wx:if="{{useMock && !testLogin.enabled}}" class="primary login-button" loading="{{loading}}" bindtap="phoneLogin">手机号验证登录</button>
-      <button wx:if="{{!useMock}}" class="login-button" loading="{{loading}}" open-type="getPhoneNumber" bindgetphonenumber="phoneLogin">微信手机号验证</button>
-      <view class="login-tip" wx:if="{{!testLogin.enabled}}">手机号需先由老板在账号页绑定。</view>
+      <button wx:if="{{useMock && !testLogin.enabled}}" class="primary login-button" loading="{{loading}}" bindtap="phoneLogin">验证并进入</button>
+      <button wx:if="{{!useMock}}" class="primary login-button" loading="{{loading}}" open-type="getPhoneNumber" bindgetphonenumber="phoneLogin">微信验证并进入</button>
+      <view class="login-tip" wx:if="{{!testLogin.enabled}}">首次验证后绑定当前微信；更换微信请联系老板解除旧绑定。</view>
     </view>
 
     <view wx:else>

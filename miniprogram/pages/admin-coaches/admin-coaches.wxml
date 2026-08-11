@@ -34,7 +34,7 @@
   </block>
 
   <block wx:else>
-    <view class="form-header"><text bindtap="closeForm">‹ 返回教练列表</text><view class="title">{{form.id ? '编辑教练' : '新增教练'}}</view><view class="subtitle">保存后，教练直接用登记手机号验证登录</view></view>
+    <view class="form-header"><text bindtap="closeForm">‹ 返回教练列表</text><view class="title">{{form.id ? '编辑教练' : '新增教练'}}</view><view class="subtitle">老板绑定手机号后，教练输入此号码即可验证进入教练端</view></view>
     <view class="section coach-form">
       <view class="account-strip"><text>登录账号</text><text>{{form.account}}</text></view>
       <view class="field"><text class="field-label">教练姓名</text><input value="{{form.fullName}}" placeholder="例如：张教练" data-field="fullName" bindinput="input" /></view>

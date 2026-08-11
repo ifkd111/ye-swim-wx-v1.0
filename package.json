@@ -1,6 +1,6 @@
 {
   "name": "ye-swim-wx-v1.0",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "private": true,
   "description": "叶 微信小程序，覆盖管理员、教练、学员预约、出勤与核销闭环。",
   "scripts": {
