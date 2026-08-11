@@ -3,6 +3,9 @@
 .balance-number { display: block; font-size: 40rpx; line-height: 1; font-weight: 800; }
 .balance-label { display: block; margin-top: 6rpx; font-size: 20rpx; opacity: .78; }
 .calendar-section { padding-bottom: 20rpx; }
+.calendar-actions { display: flex; align-items: center; gap: 20rpx; }
+.show-code-action { padding: 13rpx 18rpx; border-radius: 14rpx; background: #176f63; color: #fff; font-size: 22rpx; font-weight: 800; }
+.show-code-action.muted { background: #e7ebe8; color: #89928e; }
 .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10rpx; }
 .date-tile { min-height: 112rpx; padding: 13rpx 4rpx 8rpx; border: 2rpx solid transparent; border-radius: 16rpx; background: #f5f6f3; text-align: center; }
 .date-tile.active { border-color: #176f63; background: #e9f4f1; color: #0c544b; }
@@ -50,3 +53,4 @@
 .calm-empty { padding: 38rpx 12rpx; color: #89928e; text-align: center; font-size: 23rpx; }
 .utility-row { display: flex; justify-content: center; gap: 56rpx; padding: 28rpx 0; color: #6f7b75; font-size: 23rpx; }
 .qr-canvas { width: 220px; height: 220px; margin: 28rpx auto; }
+.qr-code-text { margin: -8rpx auto 16rpx; color: #176f63; font-size: 22rpx; font-weight: 800; text-align: center; letter-spacing: 1rpx; }

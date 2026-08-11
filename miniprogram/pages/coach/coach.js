@@ -1,5 +1,6 @@
 const api = require("../../utils/api");
 const rules = require("../../utils/rules");
+const scanner = require("../../utils/scanner");
 
 const WEEKDAYS = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
 const TIMES = ["08:00-09:00", "09:00-10:00", "10:00-11:00", "14:00-15:00", "15:00-16:00", "16:00-17:00", "17:00-18:00", "18:00-19:00", "19:00-20:00"];
@@ -130,16 +131,15 @@ Page({
   },
 
   scanVerify() {
-    wx.scanCode({
-      onlyFromCamera: false,
-      scanType: ["qrCode"],
-      success: (res) => {
-        const code = res.result || res.path || "";
-        if (!code) return;
-        api.syncing("正在核销");
-        api.call("verifyScheduleQr", { code }).then((result) => { api.done(result.message || "已核销"); this.load(); }).catch(api.fail);
-      },
-      fail: () => api.toast("扫码已取消")
+    scanner.scanQr().then((code) => {
+      api.syncing("正在核销");
+      return api.call("verifyScheduleQr", { code });
+    }).then((result) => {
+      api.done(result.message || "已核销");
+      if (result.log && result.log.sourceScheduleId) this.openFeedback(result.log.sourceScheduleId);
+      this.load();
+    }).catch((error) => {
+      if (!scanner.isCancelled(error)) api.fail(error);
     });
   },
 

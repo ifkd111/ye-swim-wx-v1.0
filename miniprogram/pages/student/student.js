@@ -67,6 +67,7 @@ Page({
     selectedSlotId: "",
     selectedSlot: null,
     submitting: false,
+    primaryQrSchedule: null,
     qrVisible: false,
     qrSchedule: null
   },
@@ -122,11 +123,15 @@ Page({
     const dayRequests = this.data.requests.filter((item) => item.slotDate === date && item.status === "pending");
     const visibleSlots = this.data.slots.filter((item) => item.slotDate === date && (!this.data.selectedCampus || item.campus === this.data.selectedCampus));
     const selectedSlot = visibleSlots.find((item) => item.id === this.data.selectedSlotId) || null;
+    const activeForSelectedDay = daySchedules.filter((item) => item.lessonStatus === "pending" && item.verificationStatus === "active");
+    const activeUpcoming = this.data.schedules.filter((item) => item.lessonStatus === "pending" && item.verificationStatus === "active" && item.diff >= 0);
+    const primaryQrSchedule = activeForSelectedDay[0] || activeUpcoming[0] || null;
     this.setData({
       selectedDateLabel: rules.dayLabel(date),
       daySchedules,
       dayRequests,
       visibleSlots,
+      primaryQrSchedule,
       selectedSlotId: selectedSlot ? selectedSlot.id : "",
       selectedSlot
     });
@@ -171,7 +176,22 @@ Page({
 
   showQr(event) {
     const schedule = this.data.schedules.find((item) => item.id === event.currentTarget.dataset.id);
-    if (!schedule || schedule.verificationStatus !== "active") return;
+    this.openQrSchedule(schedule);
+  },
+
+  showPrimaryQr() {
+    if (!this.data.primaryQrSchedule) {
+      api.toast("暂无待核销课程");
+      return;
+    }
+    this.openQrSchedule(this.data.primaryQrSchedule);
+  },
+
+  openQrSchedule(schedule) {
+    if (!schedule || schedule.lessonStatus !== "pending" || schedule.verificationStatus !== "active") {
+      api.toast("该课程暂无可用上课码");
+      return;
+    }
     this.setData({ qrVisible: true, qrSchedule: schedule });
     setTimeout(() => qrcode.drawCanvas("homeQrCanvas", schedule.verificationPayload || rules.verificationPayload(schedule.verificationCode), { size: 220 }), 80);
   },

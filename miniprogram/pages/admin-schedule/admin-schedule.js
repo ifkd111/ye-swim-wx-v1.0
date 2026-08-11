@@ -1,5 +1,6 @@
 const api = require("../../utils/api");
 const rules = require("../../utils/rules");
+const scanner = require("../../utils/scanner");
 
 const emptyForm = {
   lessonDate: "",
@@ -136,25 +137,15 @@ Page({
   },
 
   scanVerify() {
-    wx.scanCode({
-      onlyFromCamera: false,
-      scanType: ["qrCode"],
-      success: (res) => {
-        const code = res.result || res.path || "";
-        if (!code) {
-          api.toast("没有识别到核销码");
-          return;
-        }
-        api.syncing("正在核销");
-        api.call("verifyScheduleQr", { code }).then((result) => {
-          api.done(result.message || "已核销");
-          if (result.log && result.log.sourceScheduleId) this.openFeedback(result.log.sourceScheduleId);
-          this.load();
-        }).catch(api.fail);
-      },
-      fail: () => {
-        api.toast("扫码已取消");
-      }
+    scanner.scanQr().then((code) => {
+      api.syncing("正在核销");
+      return api.call("verifyScheduleQr", { code });
+    }).then((result) => {
+      api.done(result.message || "已核销");
+      if (result.log && result.log.sourceScheduleId) this.openFeedback(result.log.sourceScheduleId);
+      this.load();
+    }).catch((error) => {
+      if (!scanner.isCancelled(error)) api.fail(error);
     });
   },
 

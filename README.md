@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 版本：`1.4.2`
+- 版本：`1.4.3`
 - 小程序 AppID：`wx7f2d509804954eaf`
 - 云环境 ID：`cloudbase-d6ge373q7724bcfe4`
 - 数据源：微信云开发正式环境；所有业务写入由 `cloudfunctions/api` 统一处理，正式环境不会凭公开默认密码自动创建或重置老板账号。
@@ -57,14 +57,14 @@ CI 上传需要微信公众平台的“代码上传密钥”，不是 AppSecret�
 
 ```powershell
 npm run ci:preview
-npm run ci:upload -- --key=你的代码上传密钥路径 --uv=1.4.2 --ud=v1.4.2老板绑定手机号与角色自动登录
+npm run ci:upload -- --key=你的代码上传密钥路径 --uv=1.4.3 --ud=v1.4.3首页上课码与扫码授权闭环
 $env:YE_SWIM_SEED_SECRET="请替换为随机长密钥"
 npm run ci:upload-function -- --key=你的代码上传密钥路径 --env=cloudbase-d6ge373q7724bcfe4
 npm run migrate:v1.3 -- --env=cloudbase-d6ge373q7724bcfe4
 npm run ci:quality
 ```
 
-当前 `1.4.2` 使用真实微信云开发环境；远端 GitHub 和 tag 发布后按发布记录同步。
+当前 `1.4.3` 使用真实微信云开发环境；远端 GitHub 和 tag 发布后按发布记录同步。
 
 ## 登录与鉴权
 
