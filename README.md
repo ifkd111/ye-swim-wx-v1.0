@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 版本：`2.0.1`
+- 版本：`2.1.0`
 - 小程序 AppID：`wx7f2d509804954eaf`
 - 云环境 ID：`cloudbase-d6ge373q7724bcfe4`
 - 数据源：微信云开发正式环境；所有业务写入由 `cloudfunctions/api` 统一处理，正式环境不会凭公开默认密码自动创建或重置老板账号。
@@ -22,12 +22,16 @@ npm run test:rules
 npm run test:auth
 npm run test:flow
 npm run test:v2
+npm run test:registration
 npm run seed:export
 ```
 
 ## 当前能力清单
 
 - 每位教练每天一张固定小程序码，可截图或转发给家长；老板本人也有教练码。
+- 老板拥有长期教练登记码 A 和学员登记码 B，可发到群里让人员自行分类扫码。
+- 教练只需授权微信手机号；家长可一次登记多名孩子并分别填写剩余课时。
+- 所有扫码登记都必须由老板确认；老板可修正姓名和课时，微信验证手机号只读且不可修改。
 - 一个家长手机号可绑定多个孩子，扫码页默认全选并允许移除未到场孩子。
 - 家长每次只能选择每人扣 1、2、3 节；同一学员同日同教练默认禁止重复扫码。
 - 允许剩余课时为负数，并在老板和家庭端明确显示欠课。
@@ -47,14 +51,14 @@ CI 上传需要微信公众平台的“代码上传密钥”，不是 AppSecret�
 
 ```powershell
 npm run ci:preview
-npm run ci:upload -- --key=你的代码上传密钥路径 --uv=2.0.0 --ud=v2.0.0纯消课：教练每日码、家庭多人消课、老板纠错
+npm run ci:upload -- --key=你的代码上传密钥路径 --uv=2.1.0 --ud=v2.1.0自助登记：A/B长期码、老板审核、多人孩子
 $env:YE_SWIM_SEED_SECRET="请替换为随机长密钥"
 npm run ci:upload-function -- --key=你的代码上传密钥路径 --env=cloudbase-d6ge373q7724bcfe4
 npm run migrate:v1.3 -- --env=cloudbase-d6ge373q7724bcfe4
 npm run ci:quality
 ```
 
-当前 `2.0.1` 使用真实微信云开发环境；远端 GitHub 和 tag 发布后按发布记录同步。
+当前 `2.1.0` 使用真实微信云开发环境；远端 GitHub 和 tag 发布后按发布记录同步。
 
 ## 登录与鉴权
 

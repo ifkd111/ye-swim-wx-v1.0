@@ -32,7 +32,7 @@ function main() {
   assert(exists(qrCodePath), "缺少二维码绘制工具");
 
   const appJson = readJson(appJsonPath);
-  assert(Array.isArray(appJson.pages) && appJson.pages.length === 8, "纯消课 V2 应只保留 8 个必要页面");
+  assert(Array.isArray(appJson.pages) && appJson.pages.length === 10, "V2.1 应保留 10 个必要页面");
 
   appJson.pages.forEach((page) => {
     ["js", "json", "wxml", "wxss"].forEach((ext) => {
@@ -77,6 +77,11 @@ function main() {
     "getHomeData",
     "consumptionHomeData",
     "dailyCoachCode",
+    "registrationContext",
+    "submitRegistration",
+    "registrationAdminData",
+    "rotateRegistrationInvite",
+    "reviewRegistration",
     "checkinContext",
     "confirmDailyCheckin",
     "bindMemberGuardian",

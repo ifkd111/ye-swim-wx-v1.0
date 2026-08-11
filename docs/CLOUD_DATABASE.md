@@ -1,11 +1,13 @@
 # 云数据库集合
 
-v2.0 日常使用的核心集合：
+v2.1 日常使用的核心集合：
 
 - `accounts`：老板、教练和家庭账号、手机号、微信绑定及角色。
 - `members`：学员姓名、家长手机号和总课时。
 - `attendanceLogs`：扫码消课、老板补录、修改和撤销信息。
 - `dailyCoachCodes`：每位教练按中国日期固定的每日码及不同环境图片。
+- `registrationInvites`：教练 A 码、学员 B 码的长期令牌、启停状态和各环境二维码图片。
+- `registrationRequests`：扫码提交的待审核教练/学员登记申请及多孩子课时资料。
 - `lessonAdjustments`：老板加课或调整总课时的审计流水。
 - `auditLogs`：撤销、纠错、补录等关键操作日志。
 

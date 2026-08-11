@@ -1,0 +1,6 @@
+{
+  "navigationBarTitleText": "自助登记",
+  "navigationBarBackgroundColor": "#f5f2eb",
+  "navigationBarTextStyle": "black",
+  "enablePullDownRefresh": true
+}

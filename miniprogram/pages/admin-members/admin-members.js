@@ -10,7 +10,7 @@ Page({
   filter() { const key = String(this.data.keyword || "").trim().toLowerCase(); this.setData({ members: this.data.allMembers.filter((item) => !key || [item.chineseName, item.phone, item.notes].some((value) => String(value || "").toLowerCase().indexOf(key) >= 0)) }); },
   search(event) { this.setData({ keyword: event.detail.value }, () => this.filter()); },
   openCreate() { this.setData({ viewMode: "form", form: emptyForm() }); },
-  edit(event) { const member = this.data.allMembers.find((item) => item.id === event.currentTarget.dataset.id); if (!member) return; this.setData({ viewMode: "form", form: { id: member.id, chineseName: member.chineseName || "", phone: member.phone || "", totalLessons: Number(member.totalLessons || 0), notes: member.notes || "" } }); },
+  edit(event) { const member = this.data.allMembers.find((item) => item.id === event.currentTarget.dataset.id); if (!member) return; this.setData({ viewMode: "form", form: { id: member.id, chineseName: member.chineseName || "", phone: member.phone || "", phoneLocked: Boolean(member.phoneLocked), totalLessons: Number(member.totalLessons || 0), notes: member.notes || "" } }); },
   closeForm() { this.setData({ viewMode: "list", form: emptyForm() }); },
   input(event) { this.setData({ ["form." + event.currentTarget.dataset.field]: event.detail.value }); },
   save() {

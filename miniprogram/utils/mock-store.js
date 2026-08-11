@@ -160,6 +160,11 @@ function initialState() {
     ],
     attendanceLogs: [],
     dailyCoachCodes: [],
+    registrationInvites: [
+      { id: "registration-invite-coach", inviteType: "coach", token: "mock-coach", status: "active", fileIds: {} },
+      { id: "registration-invite-student", inviteType: "student", token: "mock-student", status: "active", fileIds: {} }
+    ],
+    registrationRequests: [],
     lessonAdjustments: [],
     courseApplications: [],
     leaveRequests: [],
@@ -199,6 +204,8 @@ function migrateState(state) {
   state.lessonFeedbacks = state.lessonFeedbacks || [];
   state.weeklyAvailabilityTemplates = state.weeklyAvailabilityTemplates || [];
   state.dailyCoachCodes = state.dailyCoachCodes || [];
+  state.registrationInvites = state.registrationInvites || [];
+  state.registrationRequests = state.registrationRequests || [];
   state.lessonAdjustments = state.lessonAdjustments || [];
   state.accounts.forEach((account) => {
     if (account.role === "student" && !Array.isArray(account.memberIds)) account.memberIds = account.memberId ? [account.memberId] : [];
@@ -334,6 +341,119 @@ function dailyCoachCode(state, viewer, payload) {
   return Object.assign({}, code, { envVersion: payload.envVersion || "develop", fileId: "" });
 }
 
+function registrationToken(scene) {
+  return decodeURIComponent(String(scene || "").trim()).replace(/^i=/, "");
+}
+
+function registrationInvite(state, scene) {
+  const token = registrationToken(scene);
+  return state.registrationInvites.find((item) => item.token === token && item.status === "active");
+}
+
+function registrationContext(state, payload) {
+  const invite = registrationInvite(state, payload.scene || payload.token);
+  if (!invite) throw new Error("这个登记码已失效，请向老板获取新二维码");
+  return { inviteType: invite.inviteType, title: invite.inviteType === "coach" ? "教练登记" : "学员登记", token: invite.token };
+}
+
+function registrationChildren(rawChildren) {
+  const rows = Array.isArray(rawChildren) ? rawChildren : [];
+  if (!rows.length || rows.length > 6) throw new Error("一次可登记 1 至 6 名孩子");
+  return rows.map((item, index) => {
+    const name = String(item && (item.name || item.chineseName) || "").trim();
+    const remainingLessons = Number(item && item.remainingLessons);
+    if (!name) throw new Error("请填写第 " + (index + 1) + " 名孩子的姓名");
+    if (!Number.isInteger(remainingLessons) || remainingLessons < -999 || remainingLessons > 99999) throw new Error("剩余课时应为 -999 至 99999 的整数");
+    return { clientId: String(item.clientId || "child-" + (index + 1)), proposedName: name, remainingLessons };
+  });
+}
+
+function submitRegistration(state, payload) {
+  const invite = registrationInvite(state, payload.scene || payload.token);
+  if (!invite) throw new Error("这个登记码已失效，请向老板获取新二维码");
+  const phone = rules.normalizePhone(payload.phone);
+  if (!rules.isChinaMobile(phone)) throw new Error("请输入用于模拟微信授权的 11 位手机号");
+  if (state.accounts.some((item) => item.phone === phone && item.status !== "disabled")) throw new Error("该手机号已有账号，请直接从登录页进入");
+  const children = invite.inviteType === "student" ? registrationChildren(payload.children) : [];
+  const current = state.registrationRequests.find((item) => item.phone === phone && item.requestType === invite.inviteType && item.status === "pending");
+  const now = new Date().toISOString();
+  const next = { requestType: invite.inviteType, phone, status: "pending", children, inviteToken: invite.token, submittedAt: current && current.submittedAt || now, updatedAt: now };
+  if (current) {
+    Object.assign(current, next);
+    return { message: "申请已更新，等待老板确认", requestId: current.id, status: "pending" };
+  }
+  next.id = newId("registration-request");
+  state.registrationRequests.push(next);
+  return { message: "登记已提交，等待老板确认", requestId: next.id, status: "pending" };
+}
+
+function ensureRegistrationInvite(state, inviteType) {
+  let invite = state.registrationInvites.find((item) => item.inviteType === inviteType && item.status === "active");
+  if (!invite) {
+    invite = { id: newId("registration-invite"), inviteType, token: newId("invite"), status: "active", fileIds: {}, createdAt: new Date().toISOString() };
+    state.registrationInvites.push(invite);
+  }
+  return invite;
+}
+
+function registrationAdminData(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const envVersion = payload.envVersion || "develop";
+  const invites = [ensureRegistrationInvite(state, "coach"), ensureRegistrationInvite(state, "student")].map((item) => Object.assign({}, item, { fileId: "", envVersion }));
+  const requests = state.registrationRequests.filter((item) => item.status === "pending").slice().sort((a, b) => String(b.submittedAt).localeCompare(String(a.submittedAt)));
+  return { invites, requests, pendingCount: requests.length };
+}
+
+function rotateRegistrationInvite(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const inviteType = String(payload.inviteType || "");
+  if (["coach", "student"].indexOf(inviteType) < 0) throw new Error("登记码类型无效");
+  state.registrationInvites.filter((item) => item.inviteType === inviteType && item.status === "active").forEach((item) => { item.status = "disabled"; item.disabledAt = new Date().toISOString(); });
+  const invite = ensureRegistrationInvite(state, inviteType);
+  return { message: (inviteType === "coach" ? "教练码 A" : "学员码 B") + " 已更换，旧码立即失效", invite: Object.assign({}, invite, { fileId: "", envVersion: payload.envVersion || "develop" }) };
+}
+
+function nextRoleAccountName(state, prefix) {
+  const max = state.accounts.reduce((value, item) => {
+    const match = new RegExp("^" + prefix + "(\\d+)$").exec(String(item.account || ""));
+    return match ? Math.max(value, Number(match[1])) : value;
+  }, 0);
+  return prefix + String(max + 1).padStart(3, "0");
+}
+
+function reviewRegistration(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const request = state.registrationRequests.find((item) => item.id === payload.requestId);
+  if (!request || request.status !== "pending") throw new Error("该申请已处理或不存在");
+  if (payload.decision === "reject") {
+    Object.assign(request, { status: "rejected", rejectReason: String(payload.reason || "老板拒绝"), reviewedAt: new Date().toISOString(), reviewedBy: viewer.account });
+    return { message: "申请已拒绝", request };
+  }
+  if (payload.decision !== "approve") throw new Error("请选择通过或拒绝");
+  if (state.accounts.some((item) => item.phone === request.phone && item.status !== "disabled")) throw new Error("该手机号已有账号，不能重复通过");
+  const now = new Date().toISOString();
+  const createdMembers = [];
+  let account;
+  if (request.requestType === "coach") {
+    const displayName = String(payload.displayName || "").trim();
+    if (!displayName) throw new Error("请填写教练姓名");
+    account = { id: newId("account"), account: nextRoleAccountName(state, "jl"), role: "coach", fullName: displayName, coachName: displayName, campus: String(payload.campus || ""), phone: request.phone, phoneLocked: true, registrationSource: "self_registration", loginMode: "phone", bindingStatus: "pending", openid: null, status: "active", createdAt: now, updatedAt: now };
+  } else {
+    const children = registrationChildren(payload.children || request.children);
+    children.forEach((child) => {
+      const member = { id: newId("member"), memberNo: nextMemberNo(state), chineseName: child.proposedName, phone: request.phone, phoneLocked: true, registrationSource: "self_registration", productId: "product-class-pack", productName: "课时账户", productType: "class_pack", totalLessons: child.remainingLessons, wechat: "", campus: "", coach: "", notes: "扫码登记，老板已确认", createdAt: now, updatedAt: now };
+      state.members.push(member);
+      createdMembers.push(member);
+    });
+    const memberIds = createdMembers.map((item) => item.id);
+    account = { id: newId("account"), account: nextRoleAccountName(state, "xy"), role: "student", fullName: createdMembers.map((item) => item.chineseName).join("、") + "家长", phone: request.phone, phoneLocked: true, registrationSource: "self_registration", memberId: memberIds[0], memberIds, loginMode: "phone", bindingStatus: "pending", openid: null, status: "active", createdAt: now, updatedAt: now };
+  }
+  state.accounts.push(account);
+  Object.assign(request, { status: "approved", reviewedAt: now, reviewedBy: viewer.account, approvedAccount: account.account, approvedChildren: createdMembers, updatedAt: now });
+  state.auditLogs.push({ id: newId("audit"), action: "approve_registration", requestId: request.id, requestType: request.requestType, phone: request.phone, account: account.account, operator: viewer.account, createdAt: now });
+  return { message: request.requestType === "coach" ? "教练已通过，可用手机号登录" : "学员已建档，家长可用手机号登录", account: safeAccount(account), members: createdMembers };
+}
+
 function checkinContext(state, viewer, payload) {
   assertRole(viewer, ["student"]);
   const token = String(payload.scene || payload.token || "").replace(/^t=/, "");
@@ -373,6 +493,7 @@ function bindMemberGuardian(state, viewer, payload) {
   const phone = rules.normalizePhone(payload.phone || member && member.phone);
   if (!member) throw new Error("学员不存在");
   if (!rules.isChinaMobile(phone)) throw new Error("请填写家长的 11 位手机号");
+  if (member.phoneLocked && phone !== rules.normalizePhone(member.phone)) throw new Error("该手机号来自微信验证，不能修改");
   let target = state.accounts.find((item) => item.role === "student" && item.phone === phone && item.status !== "disabled");
   if (!target) {
     const count = state.accounts.filter((item) => item.role === "student").length + 1;
@@ -690,9 +811,10 @@ function saveMember(state, viewer, payload) {
   const raw = payload.member || payload;
   const id = String(raw.id || "").trim();
   const current = id ? state.members.find((item) => item.id === id) : null;
+  if (current && current.phoneLocked && raw.phone !== undefined && rules.normalizePhone(raw.phone) !== rules.normalizePhone(current.phone)) throw new Error("该手机号来自微信验证，不能修改");
   const member = memberPayload(state, raw, current);
   if (!member.chineseName) throw new Error("学员姓名不能为空");
-  if (!Number.isFinite(Number(member.totalLessons)) || Number(member.totalLessons) < 0 || Number(member.totalLessons) > 99999) throw new Error("总课时应为 0 至 99999");
+  if (!Number.isFinite(Number(member.totalLessons)) || Number(member.totalLessons) < -999 || Number(member.totalLessons) > 99999) throw new Error("总课时应为 -999 至 99999");
 
   if (current) {
     Object.assign(current, member, { updatedAt: new Date().toISOString() });
@@ -760,6 +882,7 @@ function saveAccount(state, viewer, payload) {
   if (duplicatePhone) throw new Error("手机号已绑定其他账号");
 
   const current = id ? state.accounts.find((item) => item.id === id) : null;
+  if (current && current.phoneLocked && raw.phone !== undefined && rules.normalizePhone(raw.phone) !== rules.normalizePhone(current.phone)) throw new Error("该手机号来自微信验证，不能修改");
   if (current && current.account !== accountName) {
     throw new Error("已创建账号不能修改账号名，请新建账号");
   }
@@ -783,6 +906,8 @@ function saveAccount(state, viewer, payload) {
     loginMode: role === "admin" ? "password" : "phone",
     bindingStatus: current && current.openid && !phoneChanged ? "bound" : phone ? "pending" : "",
     status: raw.status || current && current.status || "active",
+    phoneLocked: Boolean(current && current.phoneLocked),
+    registrationSource: current && current.registrationSource || "",
     updatedAt: new Date().toISOString()
   });
   if (phoneChanged) next.openid = null;
@@ -1404,6 +1529,16 @@ function call(action, payload) {
   if (action === "login") return login(payload || {});
   if (action === "loginByPhone") return loginByPhone(payload || {});
   if (action === "loginForTest") return loginForTest(payload || {});
+  if (action === "registrationContext") {
+    const result = registrationContext(state, payload || {});
+    saveState(state);
+    return clone(result);
+  }
+  if (action === "submitRegistration") {
+    const result = submitRegistration(state, payload || {});
+    saveState(state);
+    return clone(result);
+  }
   if (action === "resetMock") {
     const fresh = initialState();
     saveState(fresh);
@@ -1417,6 +1552,9 @@ function call(action, payload) {
   if (action === "getHomeData") result = homeData(state, viewer);
   else if (action === "consumptionHomeData") result = consumptionHomeData(state, viewer);
   else if (action === "dailyCoachCode") result = dailyCoachCode(state, viewer, payload);
+  else if (action === "registrationAdminData") result = registrationAdminData(state, viewer, payload);
+  else if (action === "rotateRegistrationInvite") result = rotateRegistrationInvite(state, viewer, payload);
+  else if (action === "reviewRegistration") result = reviewRegistration(state, viewer, payload);
   else if (action === "checkinContext") result = checkinContext(state, viewer, payload);
   else if (action === "confirmDailyCheckin") result = confirmDailyCheckin(state, viewer, payload);
   else if (action === "bindMemberGuardian") result = bindMemberGuardian(state, viewer, payload);

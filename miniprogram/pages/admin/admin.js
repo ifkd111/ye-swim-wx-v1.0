@@ -15,6 +15,7 @@ Page({
   },
   goCoaches() { wx.navigateTo({ url: "/pages/admin-coaches/admin-coaches" }); },
   goMembers() { wx.navigateTo({ url: "/pages/admin-members/admin-members" }); },
+  goRegistration() { wx.navigateTo({ url: "/pages/admin-registration/admin-registration" }); },
   previewCode() { if (this.data.code && this.data.code.fileId) wx.previewImage({ urls: [this.data.code.fileId] }); },
   openManual() {
     const now = rules.shanghaiNow();

@@ -98,6 +98,7 @@ Page({
         account: coach.account || "",
         fullName: coach.fullName || coach.coachName || "",
         phone: coach.phone || "",
+        phoneLocked: Boolean(coach.phoneLocked),
         campus: "",
         coachName: coach.coachName || coach.fullName || "",
         status: coach.status || "active"

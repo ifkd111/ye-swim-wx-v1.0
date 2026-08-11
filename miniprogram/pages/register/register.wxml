@@ -1,0 +1,34 @@
+<view class="page register-page">
+  <view wx:if="{{loading}}" class="state-page"><view class="state-letter">叶</view><view class="state-title">正在读取登记码</view><view class="state-note">请稍候</view></view>
+  <view wx:elif="{{error}}" class="state-page"><view class="state-letter muted">!</view><view class="state-title">登记码不可用</view><view class="state-note">{{error}}</view></view>
+  <view wx:elif="{{submitted}}" class="state-page success"><view class="state-letter">已</view><view class="state-title">已经提交给老板</view><view class="state-note">老板确认姓名和课时后，你就可以用这个手机号从登录页进入。</view><button class="primary state-action" bindtap="goLogin">前往登录页</button></view>
+  <block wx:elif="{{context}}">
+    <view class="register-hero">
+      <view class="code-letter">{{context.inviteType === 'coach' ? 'A' : 'B'}}</view>
+      <view class="hero-copy"><view class="eyebrow">叶 · 自助登记</view><view class="hero-title">{{context.inviteType === 'coach' ? '教练登记' : '学员登记'}}</view><view class="hero-note">先提交资料，老板确认后账号才会生效</view></view>
+    </view>
+
+    <view class="flow-strip"><view class="flow active"><text>1</text><view>填写并授权</view></view><view class="flow-line"></view><view class="flow"><text>2</text><view>老板确认</view></view><view class="flow-line"></view><view class="flow"><text>3</text><view>手机号登录</view></view></view>
+
+    <view wx:if="{{context.inviteType === 'coach'}}" class="section coach-panel">
+      <view class="section-title">只需验证手机号</view>
+      <view class="section-note">无需填写姓名。老板会在审核时为你设置教练姓名。</view>
+      <view class="privacy-note"><text>只</text><view><view>手机号由微信验证</view><view>提交后不能自行修改，避免账号混淆</view></view></view>
+    </view>
+
+    <view wx:else class="children-section">
+      <view class="section-heading"><view><view class="section-title">填写孩子信息</view><view class="section-note">双胞胎或多名孩子可以一次添加</view></view><view class="count-badge">{{children.length}} / 6</view></view>
+      <view class="child-card" wx:for="{{children}}" wx:key="clientId">
+        <view class="child-head"><view class="child-index">孩子 {{index + 1}}</view><view wx:if="{{children.length > 1}}" class="remove-link" data-index="{{index}}" bindtap="removeChild">移除</view></view>
+        <label class="field"><text class="field-label">孩子姓名</text><input value="{{item.name}}" maxlength="20" placeholder="老板审核时可以修正" data-index="{{index}}" data-field="name" bindinput="childInput" /></label>
+        <label class="field"><text class="field-label">当前剩余课时</text><input type="number" value="{{item.remainingLessons}}" placeholder="例如 12，欠课可填 -1" data-index="{{index}}" data-field="remainingLessons" bindinput="childInput" /><text class="field-help">请按现在真实剩余课时填写，老板会再次核对</text></label>
+      </view>
+      <button class="add-child" bindtap="addChild" disabled="{{children.length >= 6}}">+ 添加另一名孩子</button>
+    </view>
+
+    <view wx:if="{{mockMode}}" class="mock-panel"><view class="field-label">开发工具模拟手机号</view><input type="number" maxlength="11" value="{{mockPhone}}" bindinput="inputMockPhone" /></view>
+    <view wx:if="{{formError}}" class="form-error">{{formError}}</view>
+    <button class="primary submit-button" open-type="getPhoneNumber" bindgetphonenumber="authorizePhone" loading="{{submitting}}" disabled="{{submitting}}">授权手机号并提交</button>
+    <view class="submit-help">提交不代表开通，必须经过老板确认</view>
+  </block>
+</view>

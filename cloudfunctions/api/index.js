@@ -813,9 +813,12 @@ async function saveMember(viewer, payload) {
   const raw = payload.member || payload;
   const id = String(raw.id || raw._id || "").trim();
   const current = id ? await findOneByAnyId("members", id) : null;
+  if (current && current.phoneLocked && raw.phone !== undefined && rules.normalizePhone(raw.phone) !== rules.normalizePhone(current.phone)) {
+    throw new Error("该手机号来自微信验证，不能修改");
+  }
   const member = await memberPayload(raw, current);
   if (!member.chineseName) throw new Error("学员姓名不能为空");
-  if (!Number.isFinite(Number(member.totalLessons)) || Number(member.totalLessons) < 0 || Number(member.totalLessons) > 99999) throw new Error("总课时应为 0 至 99999");
+  if (!Number.isFinite(Number(member.totalLessons)) || Number(member.totalLessons) < -999 || Number(member.totalLessons) > 99999) throw new Error("总课时应为 -999 至 99999");
 
   if (current) {
     delete member._id;
@@ -871,6 +874,9 @@ async function saveAccount(viewer, payload) {
 
   const id = String(raw.id || raw._id || "").trim();
   const current = id ? await findOneByAnyId("accounts", id) : null;
+  if (current && current.phoneLocked && raw.phone !== undefined && rules.normalizePhone(raw.phone) !== rules.normalizePhone(current.phone)) {
+    throw new Error("该手机号来自微信验证，不能修改");
+  }
   if (current && current.account !== accountName) {
     throw new Error("已创建账号不能修改账号名，请新建账号");
   }
@@ -905,6 +911,8 @@ async function saveAccount(viewer, payload) {
     loginMode: role === "admin" ? "password" : "phone",
     bindingStatus: current && current.openid && !phoneChanged ? "bound" : phone ? "pending" : "",
     status: raw.status || current && current.status || "active",
+    phoneLocked: Boolean(current && current.phoneLocked),
+    registrationSource: current && current.registrationSource || "",
     updatedAt: nowIso()
   };
   if (phoneChanged) account.openid = null;
@@ -1544,12 +1552,22 @@ async function nextStudentAccountName(accounts) {
   return "xy" + String(max + 1).padStart(3, "0");
 }
 
+async function nextCoachAccountName(accounts) {
+  const rows = accounts || await list("accounts", {}, 1500);
+  const max = rows.reduce((value, item) => {
+    const match = /^jl(\d+)$/.exec(String(item.account || ""));
+    return match ? Math.max(value, Number(match[1])) : value;
+  }, 0);
+  return "jl" + String(max + 1).padStart(3, "0");
+}
+
 async function bindMemberGuardian(viewer, payload) {
   assertRole(viewer, ["admin"]);
   const member = await findOneByAnyId("members", payload.memberId);
   if (!member) throw new Error("学员不存在");
   const phone = rules.normalizePhone(payload.phone || member.phone);
   if (!rules.isChinaMobile(phone)) throw new Error("请填写家长的 11 位手机号");
+  if (member.phoneLocked && phone !== rules.normalizePhone(member.phone)) throw new Error("该手机号来自微信验证，不能修改");
   const accounts = await list("accounts", {}, 1500);
   const students = accounts.filter((item) => item.role === "student");
   const oldAccounts = students.filter((item) => linkedMemberIds(item).indexOf(docKey(member)) >= 0 || linkedMemberIds(item).indexOf(member.id) >= 0);
@@ -1595,6 +1613,232 @@ function coachIdentity(viewer) {
     coachAccount: viewer.account,
     coachName: viewer.coachName || viewer.fullName || (viewer.role === "admin" ? "老板" : viewer.account)
   };
+}
+
+function registrationInviteType(value) {
+  const type = String(value || "").trim();
+  if (["coach", "student"].indexOf(type) < 0) throw new Error("登记码类型无效");
+  return type;
+}
+
+function registrationToken(scene) {
+  const value = decodeURIComponent(String(scene || "").trim());
+  return value.indexOf("i=") === 0 ? value.slice(2) : value;
+}
+
+async function findRegistrationInvite(scene) {
+  const token = registrationToken(scene);
+  if (!token) return null;
+  return (await list("registrationInvites", { token, status: "active" }, 1))[0] || null;
+}
+
+async function registrationContext(payload) {
+  const invite = await findRegistrationInvite(payload.scene || payload.token);
+  if (!invite) throw new Error("这个登记码已失效，请向老板获取新二维码");
+  return {
+    inviteType: invite.inviteType,
+    title: invite.inviteType === "coach" ? "教练登记" : "学员登记",
+    token: invite.token
+  };
+}
+
+function registrationChildren(rawChildren) {
+  const rows = Array.isArray(rawChildren) ? rawChildren : [];
+  if (!rows.length || rows.length > 6) throw new Error("一次可登记 1 至 6 名孩子");
+  return rows.map((item, index) => {
+    const name = String(item && (item.name || item.chineseName) || "").trim();
+    const remainingLessons = Number(item && item.remainingLessons);
+    if (!name) throw new Error("请填写第 " + (index + 1) + " 名孩子的姓名");
+    if (name.length > 20) throw new Error("孩子姓名不能超过 20 个字");
+    if (!Number.isInteger(remainingLessons) || remainingLessons < -999 || remainingLessons > 99999) {
+      throw new Error("剩余课时应为 -999 至 99999 的整数");
+    }
+    return {
+      clientId: String(item.clientId || "child-" + (index + 1)).slice(0, 40),
+      proposedName: name,
+      remainingLessons
+    };
+  });
+}
+
+async function submitRegistration(payload) {
+  const invite = await findRegistrationInvite(payload.scene || payload.token);
+  if (!invite) throw new Error("这个登记码已失效，请向老板获取新二维码");
+  let phone = await getPhoneNumberFromCode(payload.phoneCode);
+  if (!phone && TEST_LOGIN_ENABLED) phone = rules.normalizePhone(payload.phone);
+  if (!rules.isChinaMobile(phone)) throw new Error("请授权微信绑定的大陆手机号");
+  const activeAccount = await getAccountByPhone(phone);
+  if (activeAccount) throw new Error("该手机号已有账号，请直接从登录页进入");
+
+  await createCollectionIfNeeded("registrationRequests");
+  const children = invite.inviteType === "student" ? registrationChildren(payload.children) : [];
+  const pending = (await list("registrationRequests", { phone, requestType: invite.inviteType, status: "pending" }, 10))[0] || null;
+  const submittedAt = nowIso();
+  const request = {
+    requestType: invite.inviteType,
+    phone,
+    status: "pending",
+    children,
+    inviteToken: invite.token,
+    submittedAt: pending && pending.submittedAt || submittedAt,
+    updatedAt: submittedAt
+  };
+  if (pending) {
+    await db.collection("registrationRequests").doc(docKey(pending)).update({ data: request });
+    return { message: "申请已更新，等待老板确认", requestId: docKey(pending), status: "pending" };
+  }
+  const result = await db.collection("registrationRequests").add({ data: request });
+  return { message: "登记已提交，等待老板确认", requestId: result._id, status: "pending" };
+}
+
+function registrationEnvVersion(value) {
+  return ["develop", "trial", "release"].indexOf(value) >= 0 ? value : "release";
+}
+
+async function registrationInviteQr(invite, envVersion) {
+  const storedFiles = Object.assign({}, invite.fileIds || {});
+  if (!storedFiles[envVersion]) {
+    const image = await cloud.openapi.wxacode.getUnlimited({
+      scene: "i=" + invite.token,
+      page: "pages/register/register",
+      checkPath: false,
+      envVersion,
+      width: 430
+    });
+    const upload = await cloud.uploadFile({
+      cloudPath: "registration-invites/" + invite.inviteType + "/" + invite.token + "-" + envVersion + ".jpg",
+      fileContent: image.buffer
+    });
+    storedFiles[envVersion] = upload.fileID;
+    await db.collection("registrationInvites").doc(docKey(invite)).update({ data: { fileIds: storedFiles, updatedAt: nowIso() } });
+  }
+  return Object.assign({}, invite, { fileIds: storedFiles, fileId: storedFiles[envVersion], envVersion });
+}
+
+async function ensureRegistrationInvite(inviteType, envVersion, createdBy) {
+  await createCollectionIfNeeded("registrationInvites");
+  const current = (await list("registrationInvites", { inviteType, status: "active" }, 1))[0] || null;
+  let invite = current;
+  if (!invite) {
+    invite = {
+      inviteType,
+      token: crypto.randomBytes(10).toString("hex"),
+      status: "active",
+      fileIds: {},
+      createdBy,
+      createdAt: nowIso(),
+      updatedAt: nowIso()
+    };
+    const result = await db.collection("registrationInvites").add({ data: invite });
+    invite._id = result._id;
+  }
+  return registrationInviteQr(invite, envVersion);
+}
+
+function publicRegistrationRequest(item) {
+  const row = withId(item);
+  return {
+    id: row.id,
+    requestType: row.requestType,
+    phone: row.phone,
+    status: row.status,
+    children: row.children || [],
+    submittedAt: row.submittedAt,
+    updatedAt: row.updatedAt
+  };
+}
+
+async function registrationAdminData(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const envVersion = registrationEnvVersion(payload.envVersion);
+  const coachInvite = await ensureRegistrationInvite("coach", envVersion, viewer.account);
+  const studentInvite = await ensureRegistrationInvite("student", envVersion, viewer.account);
+  await createCollectionIfNeeded("registrationRequests");
+  const requests = (await list("registrationRequests", { status: "pending" }, 500))
+    .map(publicRegistrationRequest)
+    .sort((a, b) => String(b.submittedAt || "").localeCompare(String(a.submittedAt || "")));
+  return {
+    invites: [coachInvite, studentInvite].map((item) => ({
+      id: docKey(item),
+      inviteType: item.inviteType,
+      token: item.token,
+      fileId: item.fileId,
+      envVersion: item.envVersion
+    })),
+    requests,
+    pendingCount: requests.length
+  };
+}
+
+async function rotateRegistrationInvite(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const inviteType = registrationInviteType(payload.inviteType);
+  const envVersion = registrationEnvVersion(payload.envVersion);
+  await createCollectionIfNeeded("registrationInvites");
+  const active = await list("registrationInvites", { inviteType, status: "active" }, 20);
+  await Promise.all(active.map((item) => db.collection("registrationInvites").doc(docKey(item)).update({
+    data: { status: "disabled", disabledAt: nowIso(), disabledBy: viewer.account, updatedAt: nowIso() }
+  })));
+  const invite = await ensureRegistrationInvite(inviteType, envVersion, viewer.account);
+  return {
+    message: (inviteType === "coach" ? "教练码 A" : "学员码 B") + " 已更换，旧码立即失效",
+    invite: { id: docKey(invite), inviteType, token: invite.token, fileId: invite.fileId, envVersion }
+  };
+}
+
+async function reviewRegistration(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const request = await findOneByAnyId("registrationRequests", payload.requestId);
+  if (!request || request.status !== "pending") throw new Error("该申请已处理或不存在");
+  const decision = String(payload.decision || "");
+  if (decision === "reject") {
+    const patch = { status: "rejected", rejectReason: String(payload.reason || "老板拒绝").trim(), reviewedAt: nowIso(), reviewedBy: viewer.account, updatedAt: nowIso() };
+    await db.collection("registrationRequests").doc(docKey(request)).update({ data: patch });
+    return { message: "申请已拒绝", request: publicRegistrationRequest(Object.assign({}, request, patch)) };
+  }
+  if (decision !== "approve") throw new Error("请选择通过或拒绝");
+  const existing = await getAccountByPhone(request.phone);
+  if (existing) throw new Error("该手机号已有账号，不能重复通过");
+  const accounts = await list("accounts", {}, 1500);
+  const approvedAt = nowIso();
+  let account;
+  const createdMembers = [];
+  if (request.requestType === "coach") {
+    const displayName = String(payload.displayName || "").trim();
+    if (!displayName) throw new Error("请填写教练姓名");
+    account = {
+      account: await nextCoachAccountName(accounts), role: "coach", fullName: displayName, coachName: displayName,
+      campus: String(payload.campus || "").trim(), phone: request.phone, phoneLocked: true,
+      registrationSource: "self_registration", loginMode: "phone", bindingStatus: "pending", openid: null,
+      status: "active", createdAt: approvedAt, updatedAt: approvedAt
+    };
+  } else {
+    const children = registrationChildren(payload.children || request.children);
+    let memberNo = (await maxMemberNo()) + 1;
+    for (const child of children) {
+      const member = {
+        memberNo, chineseName: child.proposedName, phone: request.phone, phoneLocked: true,
+        registrationSource: "self_registration", productId: "product-class-pack", productName: "课时账户",
+        productType: "class_pack", totalLessons: child.remainingLessons, wechat: "", campus: "", coach: "",
+        cardExpireDate: "", notes: "扫码登记，老板已确认", createdAt: approvedAt, updatedAt: approvedAt
+      };
+      const result = await db.collection("members").add({ data: member });
+      createdMembers.push(Object.assign({ id: result._id }, member));
+      memberNo += 1;
+    }
+    const memberIds = createdMembers.map((item) => item.id);
+    account = {
+      account: await nextStudentAccountName(accounts), role: "student", fullName: createdMembers.map((item) => item.chineseName).join("、") + "家长",
+      phone: request.phone, phoneLocked: true, registrationSource: "self_registration", memberId: memberIds[0], memberIds,
+      loginMode: "phone", bindingStatus: "pending", openid: null, status: "active", createdAt: approvedAt, updatedAt: approvedAt
+    };
+  }
+  const accountResult = await db.collection("accounts").add({ data: account });
+  const approved = { status: "approved", reviewedAt: approvedAt, reviewedBy: viewer.account, approvedAccount: account.account, approvedChildren: createdMembers, updatedAt: approvedAt };
+  await db.collection("registrationRequests").doc(docKey(request)).update({ data: approved });
+  await createCollectionIfNeeded("auditLogs");
+  await db.collection("auditLogs").add({ data: { action: "approve_registration", requestId: docKey(request), requestType: request.requestType, phone: request.phone, account: account.account, operator: viewer.account, createdAt: approvedAt } });
+  return { message: request.requestType === "coach" ? "教练已通过，可用手机号登录" : "学员已建档，家长可用手机号登录", account: safeAccount(Object.assign({ _id: accountResult._id }, account)), members: createdMembers };
 }
 
 async function dailyCoachCode(viewer, payload) {
@@ -1831,6 +2075,8 @@ exports.main = async (event) => {
     if (action === "login") return ok(await login(payload, wxContext));
     if (action === "loginByPhone") return ok(await loginByPhone(payload, wxContext));
     if (action === "loginForTest") return ok(await loginForTest(payload));
+    if (action === "registrationContext") return ok(await registrationContext(payload));
+    if (action === "submitRegistration") return ok(await submitRegistration(payload));
     if (action === "seedClearCollection") return ok(await seedClearCollection(payload));
     if (action === "seedImportBatch") return ok(await seedImportBatch(payload));
     if (action === "seedFinalize") return ok(await seedFinalize(payload));
@@ -1842,6 +2088,9 @@ exports.main = async (event) => {
       getHomeData,
       consumptionHomeData,
       dailyCoachCode,
+      registrationAdminData,
+      rotateRegistrationInvite,
+      reviewRegistration,
       checkinContext,
       confirmDailyCheckin,
       bindMemberGuardian,

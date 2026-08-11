@@ -2,11 +2,13 @@
   "pages": [
     "pages/login/login",
     "pages/admin/admin",
+    "pages/admin-registration/admin-registration",
     "pages/admin-coaches/admin-coaches",
     "pages/admin-members/admin-members",
     "pages/coach/coach",
     "pages/student/student",
     "pages/checkin/checkin",
+    "pages/register/register",
     "pages/change-password/change-password"
   ],
   "window": {
