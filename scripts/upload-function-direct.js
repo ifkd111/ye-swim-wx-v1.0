@@ -31,7 +31,6 @@ function securityVariables() {
     { key: "YE_SWIM_SEED_SECRET", value: seedSecret() },
     { key: "YE_SWIM_ENABLE_TEST_LOGIN", value: process.env.YE_SWIM_ENABLE_TEST_LOGIN === "true" ? "true" : "false" },
     { key: "YE_SWIM_ALLOW_ADMIN_BOOTSTRAP", value: process.env.YE_SWIM_ALLOW_ADMIN_BOOTSTRAP === "true" ? "true" : "false" },
-    { key: "YE_SWIM_ALLOW_ADMIN_REBIND", value: process.env.YE_SWIM_ALLOW_ADMIN_REBIND === "true" ? "true" : "false" },
     { key: "YE_SWIM_ENABLE_SEED_IMPORT", value: process.env.YE_SWIM_ENABLE_SEED_IMPORT === "true" ? "true" : "false" }
   ];
   if (process.env.YE_SWIM_ENABLE_TEST_LOGIN === "true") {

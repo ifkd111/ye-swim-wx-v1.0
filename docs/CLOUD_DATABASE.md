@@ -42,7 +42,6 @@ v2.0 日常使用的核心集合：
 
 - `YE_SWIM_SEED_SECRET`：必填，使用随机长密钥；上传云函数和导入种子数据时必须显式提供。
 - `YE_SWIM_ALLOW_ADMIN_BOOTSTRAP`：默认 `false`，只用于空库受控初始化。
-- `YE_SWIM_ALLOW_ADMIN_REBIND`：默认 `false`，只用于老板账号紧急换绑。
 - `YE_SWIM_ENABLE_TEST_LOGIN`：正式环境保持 `false`。
 - `YE_SWIM_ENABLE_SEED_IMPORT`：默认 `false`；导入期间临时开启，完成后立即关闭。
 

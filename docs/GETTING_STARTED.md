@@ -48,7 +48,7 @@ module.exports = {
 
 4. 上传并部署 `cloudfunctions/api`。
 5. 用随机长值设置云函数环境变量 `YE_SWIM_SEED_SECRET`，再按 [IMPORT_SEED.md](IMPORT_SEED.md) 导入起手数据。
-6. `YE_SWIM_ALLOW_ADMIN_BOOTSTRAP`、`YE_SWIM_ALLOW_ADMIN_REBIND`、`YE_SWIM_ENABLE_TEST_LOGIN` 保持 `false`；如确有应急需要，只临时开启并在完成后关闭。
+6. `YE_SWIM_ALLOW_ADMIN_BOOTSTRAP`、`YE_SWIM_ENABLE_TEST_LOGIN` 保持 `false`；如确有应急需要，只临时开启并在完成后关闭。
 
 ## 上传体验版
 

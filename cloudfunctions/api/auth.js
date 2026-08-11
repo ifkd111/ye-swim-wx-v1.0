@@ -26,6 +26,20 @@ function safeEqual(left, right) {
   return first.length === second.length && crypto.timingSafeEqual(first, second);
 }
 
+function hashSessionToken(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
+}
+
+function isPasswordSessionValid(account, token, now) {
+  if (!account || account.role !== "admin" || !token) return false;
+  const currentTime = now instanceof Date ? now.getTime() : Number(now || Date.now());
+  const tokenHash = hashSessionToken(token);
+  return (Array.isArray(account.passwordSessions) ? account.passwordSessions : []).some((session) => {
+    const expiresAt = Date.parse(session && session.expiresAt || "");
+    return Number.isFinite(expiresAt) && expiresAt > currentTime && safeEqual(session.tokenHash, tokenHash);
+  });
+}
+
 function verifiedPhoneMatches(expectedPhone, verifiedPhone) {
   const expected = String(expectedPhone || "").replace(/\D/g, "").slice(0, 11);
   const verified = String(verifiedPhone || "").replace(/\D/g, "").slice(0, 11);
@@ -38,5 +52,7 @@ module.exports = {
   isWechatSessionBound,
   canBindWechat,
   safeEqual,
+  hashSessionToken,
+  isPasswordSessionValid,
   verifiedPhoneMatches
 };

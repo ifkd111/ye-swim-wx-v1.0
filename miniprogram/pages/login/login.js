@@ -58,8 +58,7 @@ Page({
     api
       .call("login", {
         account: this.data.account,
-        password: this.data.password,
-        openid: "mock-openid"
+        password: this.data.password
       })
       .then((result) => {
         api.saveSession(result.session);

@@ -8,7 +8,7 @@
 
 ## 当前状态
 
-- 版本：`2.0.0`
+- 版本：`2.0.1`
 - 小程序 AppID：`wx7f2d509804954eaf`
 - 云环境 ID：`cloudbase-d6ge373q7724bcfe4`
 - 数据源：微信云开发正式环境；所有业务写入由 `cloudfunctions/api` 统一处理，正式环境不会凭公开默认密码自动创建或重置老板账号。
@@ -54,16 +54,17 @@ npm run migrate:v1.3 -- --env=cloudbase-d6ge373q7724bcfe4
 npm run ci:quality
 ```
 
-当前 `2.0.0` 使用真实微信云开发环境；远端 GitHub 和 tag 发布后按发布记录同步。
+当前 `2.0.1` 使用真实微信云开发环境；远端 GitHub 和 tag 发布后按发布记录同步。
 
 ## 登录与鉴权
 
 - 正式环境老板账号应通过种子数据或受控初始化创建；不会因有人尝试公开默认口令而自动恢复密码。
 - 教练和学员只允许微信手机号验证登录，账号密码入口不能绕过手机号验证。
-- 所有已登录业务请求都会重新校验当前微信 `openid`；老板可在账号页解除教练/学员的旧微信绑定。
+- 老板使用账号密码登录，生成独立的安全会话，不绑定当前微信；教练和家长的业务请求继续校验当前微信 `openid`。
+- 老板可在账号页解除教练/学员的旧微信绑定。
 - mock 示例账号仍用于本地自动测试，不应当作为生产凭据。
 
-云函数上传和种子导入必须显式设置随机长密钥 `YE_SWIM_SEED_SECRET`。`YE_SWIM_ALLOW_ADMIN_BOOTSTRAP`、`YE_SWIM_ALLOW_ADMIN_REBIND` 和 `YE_SWIM_ENABLE_TEST_LOGIN` 均默认关闭，仅在受控应急或开发环境临时开启。
+云函数上传和种子导入必须显式设置随机长密钥 `YE_SWIM_SEED_SECRET`。`YE_SWIM_ALLOW_ADMIN_BOOTSTRAP` 和 `YE_SWIM_ENABLE_TEST_LOGIN` 均默认关闭，仅在受控应急或开发环境临时开启。
 
 ## 小白启动说明
 

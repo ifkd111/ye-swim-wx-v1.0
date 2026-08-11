@@ -10,8 +10,9 @@ const _ = db.command;
 const TEST_LOGIN_ENABLED = process.env.YE_SWIM_ENABLE_TEST_LOGIN === "true";
 const DEV_TEST_PHONE = rules.normalizePhone(process.env.YE_SWIM_TEST_PHONE || "");
 const ALLOW_ADMIN_BOOTSTRAP = auth.envFlag(process.env, "YE_SWIM_ALLOW_ADMIN_BOOTSTRAP");
-const ALLOW_ADMIN_REBIND = auth.envFlag(process.env, "YE_SWIM_ALLOW_ADMIN_REBIND");
 const SEED_IMPORT_ENABLED = auth.envFlag(process.env, "YE_SWIM_ENABLE_SEED_IMPORT");
+const PASSWORD_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PASSWORD_SESSION_LIMIT = 5;
 
 function ok(data) {
   return { ok: true, data };
@@ -115,11 +116,26 @@ async function findOneByAnyId(collection, id) {
 
 function safeAccount(account) {
   const result = withId(account);
-  result.wechatBound = Boolean(result.openid);
+  result.wechatBound = result.role === "admin" ? false : Boolean(result.openid);
   delete result.passwordHash;
   delete result.passwordSalt;
+  delete result.passwordSessions;
   delete result.openid;
   return result;
+}
+
+function createPasswordSession(account) {
+  const token = crypto.randomBytes(32).toString("hex");
+  const now = Date.now();
+  const activeSessions = (Array.isArray(account.passwordSessions) ? account.passwordSessions : [])
+    .filter((session) => Date.parse(session && session.expiresAt || "") > now)
+    .slice(-(PASSWORD_SESSION_LIMIT - 1));
+  activeSessions.push({
+    tokenHash: auth.hashSessionToken(token),
+    createdAt: new Date(now).toISOString(),
+    expiresAt: new Date(now + PASSWORD_SESSION_TTL_MS).toISOString()
+  });
+  return { token, sessions: activeSessions };
 }
 
 async function getAccountByName(accountName) {
@@ -175,6 +191,9 @@ async function getAccountBySession(session, wxContext) {
   const account = await getAccountByName(session.account);
   if (!account) return null;
   if (TEST_LOGIN_ENABLED && DEV_TEST_PHONE && session.testLogin && session.testPhone === DEV_TEST_PHONE) return account;
+  if (account.role === "admin") {
+    return auth.isPasswordSessionValid(account, session.authToken) ? account : null;
+  }
   return auth.isWechatSessionBound(account, wxContext) ? account : null;
 }
 
@@ -339,8 +358,6 @@ async function ensureAdminAccount(accountName, password) {
 }
 
 async function login(payload, wxContext) {
-  const currentOpenid = auth.wxOpenid(wxContext);
-  if (!currentOpenid) throw new Error("无法识别当前微信，请退出后重试");
   const loginId = String(payload.account || "").trim();
   const accountName = rules.normalizeAccount(loginId);
   const isPhoneLoginId = rules.isChinaMobile(loginId);
@@ -368,12 +385,11 @@ async function login(payload, wxContext) {
 
   const role = isPhoneLoginId ? account.role : rules.roleFromAccount(accountName);
   if (!role || role !== account.role) throw new Error("账号角色配置不正确");
-  if (!auth.canBindWechat(account, wxContext, ALLOW_ADMIN_REBIND)) {
-    throw new Error("老板账号已绑定其他微信，请使用原微信登录或由运维临时开启换绑");
-  }
-
+  const passwordSession = createPasswordSession(account);
   const loginPatch = {
-    openid: currentOpenid,
+    openid: null,
+    bindingStatus: "",
+    passwordSessions: passwordSession.sessions,
     lastLoginAt: nowIso(),
     updatedAt: nowIso()
   };
@@ -383,9 +399,12 @@ async function login(payload, wxContext) {
   }
   await db.collection("accounts").doc(account._id).update({ data: loginPatch });
 
+  const session = safeAccount(Object.assign({}, account, loginPatch));
+  session.authMethod = "password";
+  session.authToken = passwordSession.token;
   return {
-    session: safeAccount(Object.assign({}, account, { openid: currentOpenid })),
-    message: "登录成功，已绑定当前微信"
+    session,
+    message: "登录成功"
   };
 }
 
@@ -891,9 +910,16 @@ async function saveAccount(viewer, payload) {
   if (phoneChanged) account.openid = null;
   if (role === "coach" && !account.coachName) throw new Error("教练账号需要填写教练名");
 
-  if (role === "admin" && (!current || raw.password)) {
+  const adminPasswordChanged = Boolean(
+    current &&
+    role === "admin" &&
+    raw.password &&
+    hashPassword(String(raw.password), current.passwordSalt) !== current.passwordHash
+  );
+  if (role === "admin" && (!current || adminPasswordChanged)) {
     account.passwordSalt = crypto.randomBytes(16).toString("hex");
     account.passwordHash = hashPassword(String(raw.password || defaultPasswordForRole(role)), account.passwordSalt);
+    account.passwordSessions = [];
   }
 
   if (current) {
@@ -920,6 +946,7 @@ async function resetAccountPassword(viewer, payload) {
     data: {
       passwordSalt,
       passwordHash: hashPassword(plainPassword, passwordSalt),
+      passwordSessions: [],
       updatedAt: nowIso()
     }
   });
@@ -939,6 +966,7 @@ async function changeMyPassword(viewer, payload) {
     data: {
       passwordSalt,
       passwordHash: hashPassword(newPassword, passwordSalt),
+      passwordSessions: [],
       updatedAt: nowIso()
     }
   });

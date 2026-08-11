@@ -49,14 +49,13 @@ function main() {
   const coach = loginByPhone("13333330001", "flow-jl001");
   const student = loginByPhone("13333330002", "flow-xy001");
   assert.strictEqual(admin.role, "admin");
+  assert.strictEqual(admin.wechatBound, false, "老板密码登录不应绑定当前微信");
+  assert.strictEqual(admin.authMethod, "password", "老板应使用独立密码会话");
   assert.strictEqual(coach.role, "coach");
   assert.strictEqual(student.role, "student");
-  assert.throws(
-    () => login("13333339999", "1324", "intruder-wechat"),
-    /绑定其他微信/,
-    "老板手机号和微信绑定校验完成前不能换绑"
-  );
-  assert.strictEqual(call(admin, "getHomeData").viewer.phone, "", "换绑失败不应提前修改老板手机号");
+  const anotherAdminSession = login("yeats", "1324", "another-wechat");
+  assert.strictEqual(anotherAdminSession.wechatBound, false, "更换微信登录老板账号仍不应产生微信绑定");
+  assert.strictEqual(call(admin, "getHomeData").viewer.phone, "", "老板密码会话应允许多端同时使用");
   assert.strictEqual(testLogin("13818793977", "admin").role, "admin", "测试手机号应能进入老板角色");
   assert.strictEqual(testLogin("13818793977", "coach").role, "coach", "测试手机号应能进入教练角色");
   assert.strictEqual(testLogin("13818793977", "student").role, "student", "测试手机号应能进入学员角色");

@@ -1,6 +1,6 @@
 <view class="page coach-page">
   <view class="app-header"><view><view class="eyebrow">今日教练码</view><view class="title">{{code.coachName || viewer.coachName || viewer.fullName}}</view></view><text class="date-label">{{code.codeDate}}</text></view>
-  <view class="qr-card" wx:if="{{code.fileId}}"><image class="daily-code" src="{{code.fileId}}" mode="aspectFit" bindtap="previewCode"></image><view class="qr-title">家长请用微信扫一扫</view><view class="qr-note">今天固定不变，可以截图或转发给家长</view></view>
+  <view class="qr-card" wx:if="{{code.fileId}}"><view class="qr-status">今日有效</view><view class="qr-frame"><image class="daily-code" src="{{code.fileId}}" mode="aspectFit" bindtap="previewCode"></image></view><view class="qr-title">家长请用微信扫一扫</view><view class="qr-note">今天固定不变，可以截图或转发给家长</view></view>
   <view class="qr-card" wx:else><view class="qr-title">今日教练码暂未生成</view><view class="qr-note">请稍后重新进入本页；仍失败时联系老板</view></view>
   <view class="section stats"><view><text>{{stats.todayStudents || 0}}</text><text>今日学员</text></view><view><text>{{stats.todayLessons || 0}}</text><text>今日消课</text></view></view>
   <view class="section"><view class="section-title">今天的消课</view><view class="log-row" wx:for="{{todayLogs}}" wx:key="id"><view><view class="name">{{item.memberName}}</view><view class="meta">{{item.attendanceTime || '已记录'}}</view></view><text class="lessons">{{item.lessonsDeducted}} 节</text></view><view wx:if="{{!todayLogs.length}}" class="empty">今天还没有学员扫码</view></view>

@@ -1,6 +1,6 @@
 {
   "name": "ye-swim-wx-v1.0",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "private": true,
   "description": "叶 微信小程序，专注教练每日码、家长扫码消课和老板课时管理。",
   "scripts": {
@@ -16,6 +16,7 @@
     "ci:upload": "node scripts/miniprogram-ci.js upload",
     "ci:upload-function": "node scripts/miniprogram-ci.js upload-function",
     "ci:upload-function-direct": "node scripts/upload-function-direct.js",
+    "ci:function-status": "node scripts/cloud-function-status.js",
     "ci:seed-cloud": "node scripts/import-cloud-seed.js",
     "migrate:v1.3": "node scripts/migrate-v1.3-fields.js",
     "ci:quality": "node scripts/miniprogram-ci.js quality"

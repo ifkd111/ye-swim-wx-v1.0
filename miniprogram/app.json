@@ -11,9 +11,9 @@
   ],
   "window": {
     "navigationBarTitleText": "叶",
-    "navigationBarBackgroundColor": "#ffffff",
+    "navigationBarBackgroundColor": "#f5f2eb",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f4f8ff",
+    "backgroundColor": "#f5f2eb",
     "backgroundTextStyle": "dark"
   },
   "style": "v2",

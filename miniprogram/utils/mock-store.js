@@ -251,7 +251,11 @@ function activeAccount(state, account) {
 
 function accountBySession(state, session) {
   if (!session || !session.account) return null;
-  return activeAccount(state, session.account);
+  const account = activeAccount(state, session.account);
+  if (!account) return null;
+  if (session.testLogin) return account;
+  if (account.role !== "admin") return account;
+  return (account.passwordSessions || []).indexOf(session.authToken) >= 0 ? account : null;
 }
 
 function assertRole(viewer, roles) {
@@ -636,8 +640,9 @@ function listPagedData(state, viewer, payload) {
 
 function safeAccount(account) {
   const result = clone(account);
-  result.wechatBound = Boolean(result.openid);
+  result.wechatBound = result.role === "admin" ? false : Boolean(result.openid);
   delete result.password;
+  delete result.passwordSessions;
   delete result.openid;
   return result;
 }
@@ -782,8 +787,10 @@ function saveAccount(state, viewer, payload) {
   });
   if (phoneChanged) next.openid = null;
 
-  if (role === "admin" && (!current || raw.password)) {
+  const adminPasswordChanged = Boolean(current && role === "admin" && raw.password && current.password !== String(raw.password));
+  if (role === "admin" && (!current || adminPasswordChanged)) {
     next.password = String(raw.password || defaultPasswordForRole(role));
+    next.passwordSessions = [];
   }
   if (role === "coach" && !next.coachName) throw new Error("教练账号需要填写教练名");
 
@@ -806,6 +813,7 @@ function resetAccountPassword(state, viewer, payload) {
   if (!account) throw new Error("账号不存在");
   if (account.role !== "admin") throw new Error("教练和学员使用手机号验证，无需重置密码");
   account.password = defaultPasswordForRole(account.role);
+  account.passwordSessions = [];
   account.updatedAt = new Date().toISOString();
   return { message: "密码已重置为系统默认密码", account: safeAccount(account) };
 }
@@ -818,6 +826,7 @@ function changeMyPassword(state, viewer, payload) {
   if (oldPassword === newPassword) throw new Error("新旧密码不能一样");
   if (viewer.password !== oldPassword) throw new Error("原密码错误");
   viewer.password = newPassword;
+  viewer.passwordSessions = [];
   viewer.updatedAt = new Date().toISOString();
   return { message: "密码已修改，请使用新密码登录" };
 }
@@ -869,22 +878,23 @@ function login(payload) {
     throw new Error("账号角色配置不正确");
   }
 
-  const openid = payload.openid || "mock-openid";
-  if (resolvedAccount.openid && resolvedAccount.openid !== openid) {
-    throw new Error("老板账号已绑定其他微信，请使用原微信登录或由运维临时开启换绑");
-  }
-
   if (adminPhoneToBind) {
     resolvedAccount.phone = adminPhoneToBind;
     resolvedAccount.loginMode = "password";
   }
-  resolvedAccount.openid = openid;
+  resolvedAccount.openid = null;
+  resolvedAccount.bindingStatus = "";
+  const authToken = "mock-admin-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+  resolvedAccount.passwordSessions = (resolvedAccount.passwordSessions || []).slice(-4).concat(authToken);
   resolvedAccount.lastLoginAt = new Date().toISOString();
   saveState(state);
 
+  const session = safeAccount(resolvedAccount);
+  session.authMethod = "password";
+  session.authToken = authToken;
   return {
-    session: safeAccount(resolvedAccount),
-    message: "登录成功，已绑定当前微信"
+    session,
+    message: "登录成功"
   };
 }
 

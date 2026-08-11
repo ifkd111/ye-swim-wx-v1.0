@@ -1,13 +1,18 @@
 <view class="page login-page">
+  <view class="ambient ambient-one"></view>
+  <view class="ambient ambient-two"></view>
   <view class="login-card">
-    <view class="brand-lockup">
+    <view class="brand-row">
       <view class="leaf-mark">
         <text class="leaf-text">叶</text>
         <view class="wave-line"></view>
       </view>
+      <view class="brand-copy">
+        <view class="title">叶</view>
+        <view class="brand-note">每一节课，都清清楚楚</view>
+      </view>
     </view>
-    <view class="title">叶</view>
-    <view class="subtitle">老板登记身份，教练和学员用自己的手机号进入对应首页。</view>
+    <view class="subtitle">老板管理课时，教练展示每日码，家长扫码完成消课。</view>
 
     <view class="login-tabs">
       <view class="chip {{mode === 'phone' ? 'active' : ''}}" bindtap="setMode" data-mode="phone">手机号登录</view>
@@ -16,8 +21,8 @@
 
     <view wx:if="{{mode === 'phone'}}">
       <view class="identity-guide">
-        <text class="identity-guide-title">微信手机号一键进入</text>
-        <text class="identity-guide-text">老板提前绑定身份，系统会自动进入教练端或家庭课时页。</text>
+        <view class="guide-mark">微</view>
+        <view class="guide-copy"><text class="identity-guide-title">微信手机号一键进入</text><text class="identity-guide-text">验证后自动识别教练或家庭身份</text></view>
       </view>
       <view class="field" wx:if="{{useMock}}">
         <text class="field-label">手机号</text>
@@ -37,6 +42,10 @@
     </view>
 
     <view wx:else>
+      <view class="identity-guide">
+        <view class="guide-mark owner">主</view>
+        <view class="guide-copy"><text class="identity-guide-title">老板账号密码登录</text><text class="identity-guide-text">不会绑定，也不会占用当前微信</text></view>
+      </view>
       <view class="field">
         <text class="field-label">账号或手机号</text>
         <input value="{{account}}" placeholder="请输入老板账号或老板手机号" bindinput="onAccountInput" />
@@ -45,7 +54,7 @@
         <text class="field-label">密码</text>
         <input password value="{{password}}" placeholder="请输入密码" bindinput="onPasswordInput" />
       </view>
-      <button class="primary login-button" loading="{{loading}}" bindtap="login">登录并绑定微信</button>
+      <button class="primary login-button" loading="{{loading}}" bindtap="login">登录</button>
     </view>
   </view>
 </view>
