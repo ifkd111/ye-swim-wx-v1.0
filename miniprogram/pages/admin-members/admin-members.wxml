@@ -1,4 +1,73 @@
-<view class="page">
-  <block wx:if="{{viewMode === 'list'}}"><view class="app-header"><view><view class="eyebrow">学员与课时</view><view class="title">{{allMembers.length}} 名学员</view></view><button class="primary mini" bindtap="openCreate">新增学员</button></view><view class="search"><input value="{{keyword}}" placeholder="搜索姓名或家长手机号" bindinput="search" /></view><view class="list-summary" wx:if="{{members.length}}">当前显示 {{visibleMembers.length}} / {{members.length}} 名</view><view class="member-card" wx:for="{{visibleMembers}}" wx:key="id" data-id="{{item.id}}" bindtap="edit"><view class="member-head"><view><view class="name">{{item.chineseName}}</view><view class="meta">家长手机 {{item.phone}}</view></view><view class="balance {{item.remainingLessons < 0 ? 'debt' : ''}}">{{item.remainingLessons < 0 ? '欠 ' + (0-item.remainingLessons) : '余 ' + item.remainingLessons}}</view></view><view class="stats"><text>总 {{item.totalLessons}}</text><text>已上 {{item.usedLessons}}</text><text>剩余 {{item.remainingLessons}}</text></view><button class="add-button" data-id="{{item.id}}" catchtap="addLessons">加课 / 调整总课时</button></view><button wx:if="{{hasMore}}" class="load-more" bindtap="loadMore">再显示 30 名</button><view wx:if="{{!members.length}}" class="empty">{{keyword ? '没有匹配的学员' : '暂无学员'}}</view></block>
-  <block wx:else><view class="form-header"><text bindtap="closeForm">‹ 返回学员列表</text><view class="title">{{form.id ? '编辑学员' : '新增学员'}}</view><view class="subtitle">同一手机号可以绑定多个孩子</view></view><view class="section"><view class="field"><text class="field-label">学员姓名</text><input value="{{form.chineseName}}" placeholder="请输入姓名" data-field="chineseName" bindinput="input" /></view><view class="field"><text class="field-label">家长手机号</text><input type="number" maxlength="11" disabled="{{form.phoneLocked}}" value="{{form.phone}}" placeholder="用于家长扫码确认" data-field="phone" bindinput="input" /><view wx:if="{{form.phoneLocked}}" class="field-help">此号码已通过微信验证，只可查看，不能修改</view></view><view class="field"><text class="field-label">总课时</text><input type="number" disabled="{{!!form.id}}" value="{{form.totalLessons}}" placeholder="0" data-field="totalLessons" bindinput="input" /><view wx:if="{{form.id}}" class="field-help">已有学员请在列表点击“加课 / 调整总课时”</view></view><view class="field"><text class="field-label">备注</text><input value="{{form.notes}}" placeholder="可选" data-field="notes" bindinput="input" /></view><button class="primary wide-action" loading="{{saving}}" bindtap="save">保存学员</button></view></block>
+<view class="page member-page">
+  <block wx:if="{{viewMode === 'list'}}">
+    <view class="compact-header">
+      <view>
+        <view class="eyebrow">学员与课时</view>
+        <view class="compact-title">学员 <text>{{activeCount}}</text></view>
+      </view>
+      <view class="header-actions">
+        <view class="action-block {{batchMode ? 'active' : ''}}" bindtap="toggleBatch">{{batchMode ? '完成' : '批量管理'}}</view>
+        <view class="action-block primary" bindtap="openCreate">新增学员</view>
+      </view>
+    </view>
+
+    <view class="search-box"><input value="{{keyword}}" placeholder="搜索姓名或家长手机号" bindinput="search" /></view>
+
+    <view class="filter-row lifecycle-row">
+      <view class="filter-block {{lifecycle === 'active' ? 'active' : ''}}" data-value="active" bindtap="setLifecycle">在读 {{activeCount}}</view>
+      <view class="filter-block {{lifecycle === 'archived' ? 'active' : ''}}" data-value="archived" bindtap="setLifecycle">已归档 {{archivedCount}}</view>
+    </view>
+    <scroll-view class="filter-scroll" scroll-x enhanced show-scrollbar="{{false}}">
+      <view class="filter-inline">
+        <view class="filter-block small {{quickFilter === 'all' ? 'active' : ''}}" data-value="all" bindtap="setQuickFilter">全部</view>
+        <view class="filter-block small {{quickFilter === 'debt' ? 'active' : ''}}" data-value="debt" bindtap="setQuickFilter">欠课</view>
+        <view class="filter-block small {{quickFilter === 'unbound' ? 'active' : ''}}" data-value="unbound" bindtap="setQuickFilter">未绑手机</view>
+        <view class="divider"></view>
+        <view class="filter-block small {{sortMode === 'pinyin' ? 'active' : ''}}" data-value="pinyin" bindtap="setSort">拼音 A–Z</view>
+        <view class="filter-block small {{sortMode === 'remainingAsc' ? 'active' : ''}}" data-value="remainingAsc" bindtap="setSort">余课少</view>
+        <view class="filter-block small {{sortMode === 'remainingDesc' ? 'active' : ''}}" data-value="remainingDesc" bindtap="setSort">余课多</view>
+      </view>
+    </scroll-view>
+
+    <view class="list-meta">
+      <text>共 {{listTotal}} 人 · 每页 {{pageSize}} 人</text>
+      <text wx:if="{{batchMode}}">点名单选择</text>
+    </view>
+
+    <view class="dense-list" wx:if="{{pageMembers.length}}">
+      <view class="member-row {{item.selected ? 'selected' : ''}}" wx:for="{{pageMembers}}" wx:key="id" data-id="{{item.id}}" bindtap="rowTap">
+        <view wx:if="{{batchMode}}" class="select-dot {{item.selected ? 'checked' : ''}}">{{item.selected ? '✓' : ''}}</view>
+        <view wx:else class="initial">{{item.initial}}</view>
+        <view class="member-main">
+          <view class="member-line"><text class="member-name">{{item.chineseName}}</text><text class="phone {{item.phoneText === '未绑定手机' ? 'warn' : ''}}">{{item.phoneText}}</text></view>
+          <view class="lesson-line"><text>总 {{item.totalLessons}}</text><text>已上 {{item.usedLessons}}</text><text>剩余 {{item.remainingLessons}}</text></view>
+        </view>
+        <view class="balance-pill {{item.remainingLessons < 0 ? 'debt' : ''}}" data-id="{{item.id}}" catchtap="addLessons">{{item.remainingLessons < 0 ? '欠' + (0-item.remainingLessons) : '余' + item.remainingLessons}}</view>
+      </view>
+    </view>
+    <view wx:else class="empty compact-empty">{{keyword ? '没有匹配的学员' : lifecycle === 'archived' ? '暂无归档学员' : '暂无学员'}}</view>
+
+    <view class="pager" wx:if="{{listTotal > pageSize}}">
+      <button class="pager-button" disabled="{{page <= 1}}" bindtap="previousPage">上一页</button>
+      <text>{{page}} / {{totalPages}}</text>
+      <button class="pager-button" disabled="{{page >= totalPages}}" bindtap="nextPage">下一页</button>
+    </view>
+
+    <view wx:if="{{batchMode}}" class="batch-bar">
+      <view class="batch-select" bindtap="togglePageSelection">{{allPageSelected ? '取消本页' : '全选本页'}}</view>
+      <view class="batch-count">已选 {{selectedCount}} 人</view>
+      <button class="batch-action {{lifecycle === 'archived' ? 'restore' : 'danger'}}" loading="{{batchSaving}}" bindtap="runBatch">{{lifecycle === 'archived' ? '恢复' : '归档'}}</button>
+    </view>
+  </block>
+
+  <block wx:else>
+    <view class="form-header"><text bindtap="closeForm">‹ 返回学员列表</text><view class="title">{{form.id ? '编辑学员' : '新增学员'}}</view><view class="subtitle">同一手机号可以绑定多个孩子</view></view>
+    <view class="section">
+      <view class="field"><text class="field-label">学员姓名</text><input value="{{form.chineseName}}" placeholder="请输入姓名" data-field="chineseName" bindinput="input" /></view>
+      <view class="field"><text class="field-label">家长手机号</text><input type="number" maxlength="11" disabled="{{form.phoneLocked}}" value="{{form.phone}}" placeholder="用于家长扫码确认" data-field="phone" bindinput="input" /><view wx:if="{{form.phoneLocked}}" class="field-help">此号码已通过微信验证，只可查看，不能修改</view><view wx:elif="{{form.id && !form.phone}}" class="field-help warn-help">历史学员暂无可靠手机号，可先保存其他信息，拿到家长确认后再绑定</view></view>
+      <view class="field"><text class="field-label">总课时</text><input type="number" disabled="{{!!form.id}}" value="{{form.totalLessons}}" placeholder="0" data-field="totalLessons" bindinput="input" /><view wx:if="{{form.id}}" class="field-help">已有学员请在名单点击右侧余课数字加课</view></view>
+      <view class="field"><text class="field-label">备注</text><input value="{{form.notes}}" placeholder="可选" data-field="notes" bindinput="input" /></view>
+      <button class="primary wide-action" loading="{{saving}}" bindtap="save">保存学员</button>
+    </view>
+  </block>
 </view>

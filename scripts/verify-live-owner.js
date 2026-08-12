@@ -67,12 +67,9 @@ async function main() {
   fs.mkdirSync(outputDir, { recursive: true });
 
   console.log("[1/6] 连接微信开发者工具");
-  const cliLaunch = /\.bat$/i.test(cliPath)
-    ? { cliPath: path.join(path.dirname(cliPath), "node.exe"), args: [path.join(path.dirname(cliPath), "cli.js")] }
-    : { cliPath, args: [] };
   const miniProgram = process.env.AUTOMATOR_WS_ENDPOINT
     ? await automator.connect({ wsEndpoint: process.env.AUTOMATOR_WS_ENDPOINT })
-    : await automator.launch(Object.assign({ projectPath: root, trustProject: true, timeout: 60000 }, cliLaunch));
+    : await automator.launch({ projectPath: root, cliPath, trustProject: true, timeout: 60000 });
   const errors = [];
   miniProgram.on("exception", (error) => errors.push(String(error && error.message || error)));
 

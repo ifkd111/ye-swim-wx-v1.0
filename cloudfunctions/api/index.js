@@ -459,7 +459,8 @@ async function loginForTest(payload) {
   };
 }
 
-async function memberViews(viewer) {
+async function memberViews(viewer, options) {
+  const includeArchived = Boolean(options && options.includeArchived && viewer.role === "admin");
   let memberQuery = {};
   let members;
   let memberKeys = [];
@@ -482,7 +483,7 @@ async function memberViews(viewer) {
     usedByMember[log.memberId] = (usedByMember[log.memberId] || 0) + normalizedLessons;
   });
 
-  return loadedMembers.map((member) => {
+  return loadedMembers.filter((member) => includeArchived || !member.archivedAt).map((member) => {
     const key = docKey(member);
     const usedLessons = rawDocKeys(member).reduce((sum, id) => sum + Number(usedByMember[id] || 0), 0);
     const balance = rules.memberStatus(member, usedLessons);
@@ -491,7 +492,8 @@ async function memberViews(viewer) {
       businessId: member.id && member._id && member.id !== member._id ? member.id : member.businessId,
       usedLessons,
       remainingLessons: balance.remaining,
-      status: balance.status
+      status: balance.status,
+      isArchived: Boolean(member.archivedAt)
     });
   });
 }
@@ -982,6 +984,34 @@ async function changeMyPassword(viewer, payload) {
     }
   });
   return { message: "密码已修改，请使用新密码登录" };
+}
+
+async function bulkUpdateMemberStatus(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const ids = uniqueValues(Array.isArray(payload.memberIds) ? payload.memberIds : []).slice(0, 100);
+  const mode = String(payload.mode || "archive");
+  if (!ids.length) throw new Error("请选择学员");
+  if (["archive", "restore"].indexOf(mode) < 0) throw new Error("批量操作类型无效");
+  const changedAt = nowIso();
+  let changed = 0;
+  for (const id of ids) {
+    const member = await findOneByAnyId("members", id);
+    if (!member) continue;
+    const data = mode === "archive"
+      ? { archivedAt: changedAt, archivedBy: viewer.account, updatedAt: changedAt }
+      : { archivedAt: _.remove(), archivedBy: _.remove(), updatedAt: changedAt };
+    await db.collection("members").doc(docKey(member)).update({ data });
+    changed += 1;
+  }
+  await createCollectionIfNeeded("auditLogs");
+  await db.collection("auditLogs").add({ data: {
+    action: mode === "archive" ? "bulk_archive_members" : "bulk_restore_members",
+    memberIds: ids,
+    changed,
+    operator: viewer.account,
+    createdAt: changedAt
+  } });
+  return { message: mode === "archive" ? "已归档 " + changed + " 名学员" : "已恢复 " + changed + " 名学员", changed };
 }
 
 async function unbindAccountWechat(viewer, payload) {
@@ -1966,8 +1996,8 @@ async function confirmDailyCheckin(viewer, payload) {
   return { message: "消课成功", batchId, logs: results, members: refreshed, confirmedAt: createdAt };
 }
 
-async function consumptionHomeData(viewer) {
-  const members = await memberViews(viewer);
+async function consumptionHomeData(viewer, payload) {
+  const members = await memberViews(viewer, { includeArchived: Boolean(payload && payload.includeArchived) });
   let logs = await list("attendanceLogs", {}, 2000);
   if (viewer.role === "coach") logs = logs.filter((item) => item.coachAccount === viewer.account || (!item.coachAccount && item.coach === viewer.coachName));
   if (viewer.role === "student") {
@@ -2101,6 +2131,7 @@ exports.main = async (event) => {
       adjustConsumption,
       manualConsumption,
       addMemberLessons,
+      bulkUpdateMemberStatus,
       listPagedData,
       saveMember,
       bulkImportMembers,

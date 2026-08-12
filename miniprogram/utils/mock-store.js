@@ -271,7 +271,8 @@ function assertRole(viewer, roles) {
   }
 }
 
-function memberViews(state, viewer) {
+function memberViews(state, viewer, options) {
+  const includeArchived = Boolean(options && options.includeArchived && viewer.role === "admin");
   const usedByMember = {};
   state.attendanceLogs.forEach((log) => {
     if (log.status === "reversed" || log.reversedAt) return;
@@ -282,6 +283,7 @@ function memberViews(state, viewer) {
   return state.members
     .filter((member) => {
       if (!viewer) return false;
+      if (member.archivedAt && !includeArchived) return false;
       if (viewer.role === "admin") return true;
       if (viewer.role === "coach") return member.coach === viewer.coachName;
       if (viewer.role === "student") return [].concat(viewer.memberIds || [], viewer.memberId || []).indexOf(member.id) >= 0;
@@ -293,7 +295,8 @@ function memberViews(state, viewer) {
       return Object.assign({}, member, {
         usedLessons,
         remainingLessons: balance.remaining,
-        status: balance.status
+        status: balance.status,
+        isArchived: Boolean(member.archivedAt)
       });
     });
 }
@@ -307,8 +310,8 @@ function timeChina() {
   return String(date.getHours()).padStart(2, "0") + ":" + String(date.getMinutes()).padStart(2, "0");
 }
 
-function consumptionHomeData(state, viewer) {
-  const members = memberViews(state, viewer);
+function consumptionHomeData(state, viewer, payload) {
+  const members = memberViews(state, viewer, { includeArchived: Boolean(payload && payload.includeArchived) });
   const memberIds = members.map((item) => item.id);
   let logs = state.attendanceLogs.slice();
   if (viewer.role === "coach") logs = logs.filter((item) => item.coachAccount === viewer.account || (!item.coachAccount && item.coach === viewer.coachName));
@@ -956,6 +959,38 @@ function changeMyPassword(state, viewer, payload) {
   return { message: "密码已修改，请使用新密码登录" };
 }
 
+function bulkUpdateMemberStatus(state, viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const ids = Array.from(new Set(Array.isArray(payload.memberIds) ? payload.memberIds.map((id) => String(id || "").trim()).filter(Boolean) : [])).slice(0, 100);
+  const mode = String(payload.mode || "archive");
+  if (!ids.length) throw new Error("请选择学员");
+  if (["archive", "restore"].indexOf(mode) < 0) throw new Error("批量操作类型无效");
+  const changedAt = new Date().toISOString();
+  let changed = 0;
+  state.members.forEach((member) => {
+    if (ids.indexOf(member.id) < 0) return;
+    if (mode === "archive") {
+      member.archivedAt = changedAt;
+      member.archivedBy = viewer.account;
+    } else {
+      delete member.archivedAt;
+      delete member.archivedBy;
+    }
+    member.updatedAt = changedAt;
+    changed += 1;
+  });
+  state.auditLogs = state.auditLogs || [];
+  state.auditLogs.push({
+    id: newId("audit"),
+    action: mode === "archive" ? "bulk_archive_members" : "bulk_restore_members",
+    memberIds: ids,
+    changed,
+    operator: viewer.account,
+    createdAt: changedAt
+  });
+  return { message: mode === "archive" ? "已归档 " + changed + " 名学员" : "已恢复 " + changed + " 名学员", changed };
+}
+
 function saveWeeklyAvailabilityTemplate(state, viewer, payload) {
   assertRole(viewer, ["admin"]);
   const rows = Array.isArray(payload.rows || payload.templates) ? payload.rows || payload.templates : [];
@@ -1553,7 +1588,7 @@ function call(action, payload) {
 
   let result;
   if (action === "getHomeData") result = homeData(state, viewer);
-  else if (action === "consumptionHomeData") result = consumptionHomeData(state, viewer);
+  else if (action === "consumptionHomeData") result = consumptionHomeData(state, viewer, payload);
   else if (action === "dailyCoachCode") result = dailyCoachCode(state, viewer, payload);
   else if (action === "registrationAdminData") result = registrationAdminData(state, viewer, payload);
   else if (action === "rotateRegistrationInvite") result = rotateRegistrationInvite(state, viewer, payload);
@@ -1565,6 +1600,7 @@ function call(action, payload) {
   else if (action === "adjustConsumption") result = adjustConsumption(state, viewer, payload);
   else if (action === "manualConsumption") result = manualConsumption(state, viewer, payload);
   else if (action === "addMemberLessons") result = addMemberLessons(state, viewer, payload);
+  else if (action === "bulkUpdateMemberStatus") result = bulkUpdateMemberStatus(state, viewer, payload);
   else if (action === "listPagedData") result = listPagedData(state, viewer, payload);
   else if (action === "saveMember") result = saveMember(state, viewer, payload);
   else if (action === "bulkImportMembers") result = bulkImportMembers(state, viewer, payload);

@@ -95,6 +95,7 @@ function main() {
     "adjustConsumption",
     "manualConsumption",
     "addMemberLessons",
+    "bulkUpdateMemberStatus",
     "listPagedData",
     "saveMember",
     "bulkImportMembers",

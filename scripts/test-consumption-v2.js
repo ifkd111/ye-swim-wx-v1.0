@@ -64,6 +64,16 @@ function main() {
   const reboundFamily = phone("13333330002", "v2-family");
   assert.strictEqual(call(reboundFamily, "consumptionHomeData").members.length, 3, "老板应能把多个孩子绑定到同一家长手机号");
 
+  const historyCount = call(admin, "consumptionHomeData").logs.length;
+  call(admin, "bulkUpdateMemberStatus", { memberIds: [newMember.id], mode: "archive" });
+  assert.strictEqual(call(reboundFamily, "consumptionHomeData").members.length, 2, "归档学员不应继续出现在家长当前名单");
+  const archivedHome = call(admin, "consumptionHomeData", { includeArchived: true });
+  const archivedMember = archivedHome.members.find((item) => item.id === newMember.id);
+  assert(archivedMember && archivedMember.isArchived, "老板应能在归档名单中看到学员");
+  assert.strictEqual(archivedHome.logs.length, historyCount, "归档不应删除历史消课流水");
+  call(admin, "bulkUpdateMemberStatus", { memberIds: [newMember.id], mode: "restore" });
+  assert.strictEqual(call(reboundFamily, "consumptionHomeData").members.length, 3, "恢复后学员应重新出现在家长当前名单");
+
   console.log("Pure consumption V2 flow passed");
 }
 
