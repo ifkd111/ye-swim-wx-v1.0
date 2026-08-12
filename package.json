@@ -1,6 +1,6 @@
 {
   "name": "ye-swim-wx-v1.0",
-  "version": "2.1.8",
+  "version": "2.1.9",
   "private": true,
   "description": "叶 微信小程序，支持自助登记、教练每日码、家长扫码消课和老板审核管理。",
   "scripts": {
@@ -13,7 +13,10 @@
     "test:registration": "node scripts/test-registration-v2.1.js",
     "test:v2.1.5": "node scripts/test-people-import-v2.1.5.js",
     "test:audit": "node scripts/test-audit-guest-v2.1.8.js",
+    "test:three-role": "node scripts/test-three-role-v2.1.8.js",
+    "test:role-ux": "node scripts/test-role-ux-v2.1.9.js",
     "verify:audit-ui": "node scripts/verify-audit-ui-v2.1.8.js",
+    "verify:role-ui": "node scripts/verify-role-home-ui.js",
     "verify:live-owner": "node scripts/verify-live-owner.js",
     "seed:export": "node scripts/export-seed-cloudbase.js",
     "seed:attendance": "node scripts/export-seed-from-attendance-xlsx.js",

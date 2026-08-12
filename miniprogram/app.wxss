@@ -221,7 +221,7 @@ textarea {
 
 button {
   margin: 0;
-  min-height: 76rpx;
+  min-height: 88rpx;
   border-radius: var(--radius-button);
   padding: 0 28rpx;
   border: 1rpx solid #d6dfda;
@@ -229,7 +229,7 @@ button {
   color: #294239;
   font-weight: 800;
   font-size: 26rpx;
-  line-height: 76rpx;
+  line-height: 88rpx;
 }
 
 button.primary {
@@ -240,10 +240,10 @@ button.primary {
 }
 
 button.mini {
-  min-height: 62rpx;
+  min-height: 88rpx;
   padding: 0 18rpx;
   font-size: 24rpx;
-  line-height: 62rpx;
+  line-height: 88rpx;
   min-width: 150rpx;
 }
 
@@ -260,7 +260,7 @@ button[disabled] {
 input,
 textarea {
   width: 100%;
-  min-height: 78rpx;
+  min-height: 88rpx;
   border-radius: 18rpx;
   padding: 0 22rpx;
   color: var(--color-text-strong);
@@ -337,7 +337,7 @@ textarea {
 }
 
 .chip {
-  min-height: 62rpx;
+  min-height: 88rpx;
   padding: 0 24rpx;
   border-radius: var(--radius-button);
   display: flex;
@@ -411,7 +411,7 @@ textarea {
 
 .picker-box {
   width: 100%;
-  min-height: 78rpx;
+  min-height: 88rpx;
   border-radius: 14rpx;
   padding: 18rpx 22rpx;
   color: var(--color-text-strong);
@@ -563,8 +563,8 @@ textarea {
 }
 
 button.block-button {
-  min-height: 64rpx;
-  line-height: 64rpx;
+  min-height: 88rpx;
+  line-height: 88rpx;
   border-radius: 15rpx;
   font-size: 22rpx;
 }

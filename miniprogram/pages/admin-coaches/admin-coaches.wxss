@@ -1,6 +1,6 @@
 .coach-admin-page { padding-bottom: 70rpx; }
 .filter-section { padding: 18rpx; }
-.search-input { min-height: 70rpx; background: #f5f7f5; border-color: #e0e6e1; }
+.search-input { min-height: 88rpx; background: #f5f7f5; border-color: #e0e6e1; }
 .coach-filter-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 9rpx; margin-top: 14rpx; }
 .filter-block { padding: 15rpx 4rpx; border: 1rpx solid #e1e6e2; border-radius: 14rpx; background: #f5f7f5; color: #718079; font-size: 20rpx; font-weight: 800; text-align: center; }
 .filter-block.active { color: #fff; background: #176f63; border-color: #176f63; }
@@ -26,7 +26,7 @@ button.danger-lite { color: #9c554b; background: #faf0ee; border-color: #efd6d1;
 .account-strip text:last-child { color: #253b34; font-weight: 850; }
 .option-board { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10rpx; }
 .option-board.two { grid-template-columns: repeat(2, 1fr); }
-.option-block { min-height: 70rpx; padding: 18rpx 8rpx; border: 2rpx solid #e0e6e1; border-radius: 15rpx; background: #f7f9f7; color: #63716a; text-align: center; font-size: 23rpx; font-weight: 800; }
+.option-block { min-height: 88rpx; padding: 18rpx 8rpx; border: 2rpx solid #e0e6e1; border-radius: 15rpx; background: #f7f9f7; color: #63716a; text-align: center; font-size: 23rpx; font-weight: 800; }
 .option-block.active { border-color: #176f63; background: #e8f4f0; color: #176f63; }
 .option-block.danger-active { border-color: #b76c60; background: #faece9; color: #9b4e44; }
 @media (max-width: 360px) { .coach-filter-row { grid-template-columns: repeat(2, 1fr); } }

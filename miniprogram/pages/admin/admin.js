@@ -4,7 +4,7 @@ const rules = require("../../utils/rules");
 function envVersion() { try { return wx.getAccountInfoSync().miniProgram.envVersion || "release"; } catch (error) { return "release"; } }
 
 Page({
-  data: { viewer: {}, members: [], accounts: [], todayLogs: [], stats: {}, code: null, loading: true, loadError: "", codeLoading: true, codeError: "", manualVisible: false, selectedCoach: "", manualMembers: [], lessonOptions: [1, 2, 3], manualLessons: 1, manualDate: "", manualTime: "", manualReason: "", saving: false },
+  data: { viewer: {}, members: [], accounts: [], todayLogs: [], stats: {}, code: null, loading: true, loadError: "", codeLoading: true, codeError: "", manualVisible: false, selectedCoach: "", manualMembers: [], manualVisibleMembers: [], manualKeyword: "", manualSelectedCount: 0, manualMatchedCount: 0, manualHasMore: false, lessonOptions: [1, 2, 3], manualLessons: 1, manualDate: "", manualTime: "", manualReason: "", saving: false },
   onShow() { if (!api.requireSession("admin")) return; this.load(); },
   load() {
     this.setData({ loading: true, loadError: "" });
@@ -35,11 +35,21 @@ Page({
   openManual() {
     if (this.data.viewer.developerReadOnly) return api.toast("开发者视角为只读");
     const now = rules.shanghaiNow();
-    this.setData({ manualVisible: true, selectedCoach: this.data.viewer.account, manualMembers: this.data.members.map((item) => Object.assign({}, item, { selected: false })), manualLessons: 1, manualDate: rules.formatDateChina(now), manualTime: String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0"), manualReason: "老板补录" });
+    this.setData({ manualVisible: true, selectedCoach: this.data.viewer.account, manualMembers: this.data.members.map((item) => Object.assign({}, item, { selected: false })), manualVisibleMembers: [], manualKeyword: "", manualSelectedCount: 0, manualMatchedCount: 0, manualHasMore: false, manualLessons: 1, manualDate: rules.formatDateChina(now), manualTime: String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0"), manualReason: "老板补录" }, () => this.refreshManualMembers());
   },
   closeManual() { this.setData({ manualVisible: false }); },
   selectCoach(event) { this.setData({ selectedCoach: event.currentTarget.dataset.account }); },
-  toggleManualMember(event) { const id = event.currentTarget.dataset.id; this.setData({ manualMembers: this.data.manualMembers.map((item) => item.id === id ? Object.assign({}, item, { selected: !item.selected }) : item) }); },
+  refreshManualMembers() {
+    const keyword = String(this.data.manualKeyword || "").trim().toLowerCase();
+    const members = this.data.manualMembers || [];
+    const selected = members.filter((item) => item.selected);
+    const matches = members.filter((item) => !keyword || [item.chineseName, item.phone, item.notes].some((value) => String(value || "").toLowerCase().indexOf(keyword) >= 0));
+    const selectedIds = selected.map((item) => item.id);
+    const unselectedMatches = matches.filter((item) => selectedIds.indexOf(item.id) < 0);
+    this.setData({ manualVisibleMembers: selected.concat(unselectedMatches.slice(0, 24)), manualSelectedCount: selected.length, manualMatchedCount: matches.length, manualHasMore: unselectedMatches.length > 24 });
+  },
+  manualSearch(event) { this.setData({ manualKeyword: event.detail.value }, () => this.refreshManualMembers()); },
+  toggleManualMember(event) { const id = event.currentTarget.dataset.id; this.setData({ manualMembers: this.data.manualMembers.map((item) => item.id === id ? Object.assign({}, item, { selected: !item.selected }) : item) }, () => this.refreshManualMembers()); },
   selectManualLessons(event) { this.setData({ manualLessons: Number(event.currentTarget.dataset.value) }); },
   manualInput(event) {
     const field = event.currentTarget.dataset.field;
