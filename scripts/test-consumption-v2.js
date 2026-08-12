@@ -34,10 +34,13 @@ function main() {
   const context = call(family, "checkinContext", { scene: "t=" + code.token });
   assert.strictEqual(context.members.length, 2, "同一家长手机号应看到两个孩子");
   const ids = context.members.map((item) => item.id);
-  const receipt = call(family, "confirmDailyCheckin", { scene: "t=" + code.token, memberIds: ids, lessons: 2, requestId: "v2-twins" });
+  const mixedLessons = [{ memberId: ids[0], lessons: 2 }, { memberId: ids[1], lessons: 1 }];
+  assert.throws(() => call(family, "confirmDailyCheckin", { scene: "t=" + code.token, memberLessons: [{ memberId: ids[0], lessons: 4 }] }), /1、2 或 3 节/, "单个学员扫码最多选择三节");
+  const receipt = call(family, "confirmDailyCheckin", { scene: "t=" + code.token, memberLessons: mixedLessons, requestId: "v2-twins" });
   assert.strictEqual(receipt.logs.length, 2, "双胞胎同时到场应分别产生两条流水");
-  assert(receipt.logs.every((item) => item.lessonsDeducted === 2), "每名到场学员都应扣两节");
-  const retried = call(family, "confirmDailyCheckin", { scene: "t=" + code.token, memberIds: ids, lessons: 2, requestId: "v2-twins" });
+  assert.strictEqual(receipt.logs.find((item) => item.memberId === ids[0]).lessonsDeducted, 2, "第一个孩子应独立扣两节");
+  assert.strictEqual(receipt.logs.find((item) => item.memberId === ids[1]).lessonsDeducted, 1, "第二个孩子应独立扣一节");
+  const retried = call(family, "confirmDailyCheckin", { scene: "t=" + code.token, memberLessons: mixedLessons, requestId: "v2-twins" });
   assert.strictEqual(retried.idempotent, true, "网络重试不应重复扣课或误报失败");
   assert.throws(() => call(family, "confirmDailyCheckin", { scene: "t=" + code.token, memberIds: [ids[0]], lessons: 1 }), /今天已在该教练处消课/, "同一学员同日同教练应阻止重复扫码");
 

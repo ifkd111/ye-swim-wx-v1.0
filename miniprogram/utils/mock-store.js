@@ -471,18 +471,25 @@ function checkinContext(state, viewer, payload) {
 
 function confirmDailyCheckin(state, viewer, payload) {
   const context = checkinContext(state, viewer, payload);
-  const lessons = Number(payload.lessons || 1);
-  if ([1, 2, 3].indexOf(lessons) < 0) throw new Error("家长每次只能选择扣 1、2 或 3 节");
   const allowed = context.members.map((item) => item.id);
-  const memberIds = Array.from(new Set(payload.memberIds || [])).filter((id) => allowed.indexOf(id) >= 0);
-  if (!memberIds.length) throw new Error("请至少选择一名到场学员");
+  const requested = Array.isArray(payload.memberLessons) && payload.memberLessons.length
+    ? payload.memberLessons.map((item) => ({ memberId: String(item.memberId || item.id || ""), lessons: Number(item.lessons) }))
+    : Array.from(new Set(payload.memberIds || [])).map((memberId) => ({ memberId: String(memberId), lessons: Number(payload.lessons || 1) }));
+  const byMember = {};
+  requested.forEach((item) => {
+    if (allowed.indexOf(item.memberId) < 0) return;
+    if ([1, 2, 3].indexOf(item.lessons) < 0) throw new Error("每名学员每次只能选择扣 1、2 或 3 节");
+    byMember[item.memberId] = item.lessons;
+  });
+  const charges = Object.keys(byMember).map((memberId) => ({ memberId, lessons: byMember[memberId] }));
+  if (!charges.length) throw new Error("请至少选择一名到场学员");
   const batchId = "scan-" + String(payload.requestId || newId("request"));
   const previous = state.attendanceLogs.filter((item) => item.batchId === batchId);
   if (previous.length) return { message: "消课成功", batchId, logs: previous, members: memberViews(state, viewer), confirmedAt: previous[0].createdAt, idempotent: true };
-  const duplicate = memberIds.find((memberId) => state.attendanceLogs.some((log) => log.memberId === memberId && log.attendanceDate === todayChina() && log.coachAccount === context.coachAccount && log.source === "coach_daily_qr" && log.status !== "reversed" && !log.reversedAt));
+  const duplicate = charges.map((item) => item.memberId).find((memberId) => state.attendanceLogs.some((log) => log.memberId === memberId && log.attendanceDate === todayChina() && log.coachAccount === context.coachAccount && log.source === "coach_daily_qr" && log.status !== "reversed" && !log.reversedAt));
   if (duplicate) throw new Error((context.members.find((item) => item.id === duplicate) || {}).chineseName + " 今天已在该教练处消课");
   const createdAt = new Date().toISOString();
-  const logs = memberIds.map((memberId) => {
+  const logs = charges.map(({ memberId, lessons }) => {
     const member = context.members.find((item) => item.id === memberId);
     const log = { id: newId("attendance"), batchId, attendanceDate: todayChina(), attendanceTime: timeChina(), memberId, memberName: member.chineseName, coachAccount: context.coachAccount, coach: context.coachName, lessonsDeducted: lessons, source: "coach_daily_qr", sourceNote: "家长扫码消课", status: "active", createdBy: viewer.account, createdAt, updatedAt: createdAt };
     state.attendanceLogs.push(log);

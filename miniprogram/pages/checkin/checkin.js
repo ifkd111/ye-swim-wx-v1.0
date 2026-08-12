@@ -1,7 +1,7 @@
 const api = require("../../utils/api");
 
 Page({
-  data: { scene: "", loading: true, context: null, selectedIds: [], lessonOptions: [1, 2, 3], lessons: 1, submitting: false, receipt: null },
+  data: { scene: "", loading: true, context: null, selectedIds: [], lessonOptions: [1, 2, 3], selectedCount: 0, totalLessons: 0, submitting: false, receipt: null },
   onLoad(options) {
     const scene = decodeURIComponent(options && options.scene || wx.getStorageSync("pendingCheckinScene") || "");
     if (!scene) { this.setData({ loading: false }); api.toast("没有识别到教练码"); return; }
@@ -14,18 +14,33 @@ Page({
   },
   load() {
     api.call("checkinContext", { scene: this.data.scene }).then((context) => {
-      const members = (context.members || []).map((item) => Object.assign({}, item, { selected: true }));
-      this.setData({ context: Object.assign({}, context, { members }), selectedIds: members.map((item) => item.id), loading: false });
+      const members = (context.members || []).map((item) => Object.assign({}, item, { selected: true, lessons: 1 }));
+      this.updateSelection(members, { context: Object.assign({}, context, { members }), loading: false });
     }).catch((error) => { this.setData({ loading: false }); api.fail(error); });
+  },
+  updateSelection(members, extra) {
+    const selected = members.filter((item) => item.selected);
+    const patch = {
+      selectedIds: selected.map((item) => item.id),
+      selectedCount: selected.length,
+      totalLessons: selected.reduce((sum, item) => sum + Number(item.lessons || 1), 0)
+    };
+    if (extra && extra.context) patch.context = extra.context;
+    else patch["context.members"] = members;
+    this.setData(Object.assign(patch, extra || {}));
   },
   toggleMember(event) {
     const id = event.currentTarget.dataset.id;
-    const selected = this.data.selectedIds.slice();
-    const index = selected.indexOf(id);
-    if (index >= 0) selected.splice(index, 1); else selected.push(id);
-    this.setData({ selectedIds: selected, "context.members": this.data.context.members.map((item) => item.id === id ? Object.assign({}, item, { selected: index < 0 }) : item) });
+    const members = this.data.context.members.map((item) => item.id === id ? Object.assign({}, item, { selected: !item.selected }) : item);
+    this.updateSelection(members);
   },
-  chooseLessons(event) { this.setData({ lessons: Number(event.currentTarget.dataset.value || 1) }); },
+  chooseMemberLessons(event) {
+    const id = event.currentTarget.dataset.id;
+    const lessons = Number(event.currentTarget.dataset.value || 1);
+    if ([1, 2, 3].indexOf(lessons) < 0) return;
+    const members = this.data.context.members.map((item) => item.id === id ? Object.assign({}, item, { lessons }) : item);
+    this.updateSelection(members);
+  },
   confirm() {
     if (this.data.submitting) return;
     if (!this.data.selectedIds.length) return api.toast("请至少选择一名到场学员");
@@ -34,13 +49,14 @@ Page({
     api.call("confirmDailyCheckin", {
       scene: this.data.scene,
       memberIds: this.data.selectedIds,
-      lessons: this.data.lessons,
+      memberLessons: this.data.context.members.filter((item) => item.selected).map((item) => ({ memberId: item.id, lessons: item.lessons })),
       requestId: Date.now().toString(36) + Math.random().toString(36).slice(2, 9)
     }).then((result) => {
       wx.removeStorageSync("pendingCheckinScene");
       api.done("消课成功");
-      const chargedIds = (result.logs || []).map((item) => item.memberId);
-      result.chargedMembers = (result.members || []).filter((item) => chargedIds.indexOf(item.id) >= 0);
+      const chargedById = {};
+      (result.logs || []).forEach((item) => { chargedById[item.memberId] = Number(item.lessonsDeducted || 1); });
+      result.chargedMembers = (result.members || []).filter((item) => chargedById[item.id]).map((item) => Object.assign({}, item, { chargedLessons: chargedById[item.id] }));
       this.setData({ receipt: result, submitting: false });
     }).catch((error) => { this.setData({ submitting: false }); api.fail(error); });
   },

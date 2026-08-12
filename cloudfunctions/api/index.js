@@ -2287,14 +2287,26 @@ async function consumptionLogsForMember(memberId) {
   return list("attendanceLogs", { memberId }, 1500);
 }
 
+function normalizeCheckinCharges(payload, allowedIds) {
+  const allowed = new Set(allowedIds.map((id) => String(id)));
+  const requested = Array.isArray(payload.memberLessons) && payload.memberLessons.length
+    ? payload.memberLessons.map((item) => ({ memberId: String(item.memberId || item.id || ""), lessons: Number(item.lessons) }))
+    : uniqueValues(payload.memberIds || []).map((memberId) => ({ memberId: String(memberId), lessons: Number(payload.lessons || 1) }));
+  const byMember = {};
+  requested.forEach((item) => {
+    if (!allowed.has(item.memberId)) return;
+    if ([1, 2, 3].indexOf(item.lessons) < 0) throw new Error("每名学员每次只能选择扣 1、2 或 3 节");
+    byMember[item.memberId] = item.lessons;
+  });
+  return Object.keys(byMember).map((memberId) => ({ memberId, lessons: byMember[memberId] }));
+}
+
 async function confirmDailyCheckin(viewer, payload) {
   assertRole(viewer, ["student"]);
   const context = await checkinContext(viewer, payload);
-  const lessons = Number(payload.lessons || 1);
-  if ([1, 2, 3].indexOf(lessons) < 0) throw new Error("家长每次只能选择扣 1、2 或 3 节");
   const allowedIds = context.members.map((item) => item.id);
-  const memberIds = uniqueValues(payload.memberIds || []).filter((id) => allowedIds.indexOf(id) >= 0);
-  if (!memberIds.length) throw new Error("请至少选择一名到场学员");
+  const charges = normalizeCheckinCharges(payload, allowedIds);
+  if (!charges.length) throw new Error("请至少选择一名到场学员");
   const requestId = String(payload.requestId || crypto.randomBytes(8).toString("hex")).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 40);
   const batchId = "scan-" + requestId;
   const previous = await list("attendanceLogs", { batchId }, 10);
@@ -2304,7 +2316,7 @@ async function confirmDailyCheckin(viewer, payload) {
   }
   const date = todayChina();
   const duplicateNames = [];
-  for (const memberId of memberIds) {
+  for (const { memberId } of charges) {
     const logs = await consumptionLogsForMember(memberId);
     const duplicated = logs.some((log) => log.attendanceDate === date && log.coachAccount === context.coachAccount && log.source === "coach_daily_qr" && log.status !== "reversed" && !log.reversedAt);
     if (duplicated) duplicateNames.push((context.members.find((item) => item.id === memberId) || {}).chineseName || memberId);
@@ -2312,7 +2324,7 @@ async function confirmDailyCheckin(viewer, payload) {
   if (duplicateNames.length) throw new Error(duplicateNames.join("、") + " 今天已在该教练处消课");
   const createdAt = nowIso();
   const results = [];
-  for (const memberId of memberIds) {
+  for (const { memberId, lessons } of charges) {
     const member = context.members.find((item) => item.id === memberId);
     const logId = batchId + "-" + crypto.createHash("md5").update(memberId).digest("hex").slice(0, 8);
     const log = {

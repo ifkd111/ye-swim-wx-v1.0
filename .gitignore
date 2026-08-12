@@ -10,6 +10,7 @@ cloudfunctions/api/seed-data.json
 preview-qrcode.jpg
 v2-daily-code-smoke.jpg
 artifacts/review-*/
+artifacts/*-coach-code-*.jpg
 ci-quality-report.json
 miniprogram/private.config.json
 miniprogram/miniprogram_npm/

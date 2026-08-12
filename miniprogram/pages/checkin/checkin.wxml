@@ -3,14 +3,13 @@
   <block wx:elif="{{receipt}}">
     <view class="success-mark">✓</view><view class="success-title">已消课</view>
     <view class="success-sub">{{receipt.logs[0].coach}} · {{receipt.logs[0].attendanceDate}} {{receipt.logs[0].attendanceTime}}</view>
-    <view class="section receipt-list"><view class="receipt-row" wx:for="{{receipt.chargedMembers}}" wx:key="id"><view><view class="name">{{item.chineseName}}</view><view class="meta">本次扣除 {{lessons}} 节</view></view><view class="balance {{item.remainingLessons < 0 ? 'debt' : ''}}">{{item.remainingLessons < 0 ? '欠 ' + (0-item.remainingLessons) : '余 ' + item.remainingLessons}} 节</view></view></view>
+    <view class="section receipt-list"><view class="receipt-row" wx:for="{{receipt.chargedMembers}}" wx:key="id"><view><view class="name">{{item.chineseName}}</view><view class="meta">本次扣除 {{item.chargedLessons}} 节</view></view><view class="balance {{item.remainingLessons < 0 ? 'debt' : ''}}">{{item.remainingLessons < 0 ? '欠 ' + (0-item.remainingLessons) : '余 ' + item.remainingLessons}} 节</view></view></view>
     <button class="primary wide-action" bindtap="goHome">查看我的课时</button>
   </block>
   <block wx:elif="{{context}}">
     <view class="hero-card"><view class="eyebrow">本次教练</view><view class="coach-name">{{context.coachName}}</view><view class="hero-meta">{{context.codeDate}} · 确认后记录服务器时间</view></view>
-    <view class="section"><view class="section-title">谁来上课了？</view><view class="section-note">默认选择全部孩子，没来的点一下移除</view><view class="member-list"><view class="member-choice {{item.selected ? 'active' : ''}}" wx:for="{{context.members}}" wx:key="id" data-id="{{item.id}}" bindtap="toggleMember"><view><view class="name">{{item.chineseName}}</view><view class="meta">总 {{item.totalLessons}} · 已上 {{item.usedLessons}} · 剩余 {{item.remainingLessons}}</view></view><text>{{item.selected ? '✓' : '+'}}</text></view></view></view>
-    <view class="section"><view class="section-title">每人扣几节？</view><view class="lesson-options"><view class="lesson-option {{lessons === item ? 'active' : ''}}" wx:for="{{lessonOptions}}" wx:key="*this" data-value="{{item}}" bindtap="chooseLessons">{{item}} 节</view></view></view>
-    <view class="confirm-summary">已选择 {{selectedIds.length}} 名学员，每人扣 {{lessons}} 节</view>
-    <button class="primary wide-action" loading="{{submitting}}" bindtap="confirm">确认消课</button>
+    <view class="section"><view class="section-title">谁来上课了？</view><view class="section-note">默认全部到场；每个孩子可单独选择扣课节数</view><view class="member-list"><view class="member-card {{item.selected ? 'active' : ''}}" wx:for="{{context.members}}" wx:key="id"><view class="member-head" data-id="{{item.id}}" bindtap="toggleMember" role="button" aria-label="{{item.chineseName}}，{{item.selected ? '已到场，点击设为未到场' : '未到场，点击设为到场'}}"><view><view class="name">{{item.chineseName}}</view><view class="meta">总 {{item.totalLessons}} · 已上 {{item.usedLessons}} · 剩余 {{item.remainingLessons}}</view></view><view class="attendance-state {{item.selected ? 'active' : ''}}">{{item.selected ? '已到场' : '未到场'}}</view></view><view class="member-lessons" wx:if="{{item.selected}}"><view class="member-lessons-label">本次扣课</view><view class="lesson-options compact"><view class="lesson-option {{item.lessons === lesson ? 'active' : ''}}" wx:for="{{lessonOptions}}" wx:for-item="lesson" wx:key="*this" data-id="{{item.id}}" data-value="{{lesson}}" catchtap="chooseMemberLessons" role="button" aria-label="{{item.chineseName}}扣{{lesson}}节">{{lesson}} 节</view></view></view></view></view></view>
+    <view class="confirm-summary">已选择 {{selectedCount}} 名学员，共扣 {{totalLessons}} 节</view>
+    <button class="primary wide-action" disabled="{{!selectedCount || submitting}}" loading="{{submitting}}" bindtap="confirm">确认消课</button>
   </block>
 </view>
