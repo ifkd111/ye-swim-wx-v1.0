@@ -1,5 +1,5 @@
 module.exports = {
-  version: "2.1.6",
+  version: "2.1.7",
   envId: "cloudbase-d6ge373q7724bcfe4",
   useMock: false,
   testLogin: {

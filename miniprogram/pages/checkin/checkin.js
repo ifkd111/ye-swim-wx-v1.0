@@ -10,6 +10,9 @@ Page({
     const session = api.currentSession();
     if (!session) { wx.reLaunch({ url: "/pages/login/login" }); return; }
     if (session.role !== "student") { this.setData({ loading: false }); api.toast("请使用家长或学员手机号登录"); return; }
+    // 已经带着有效家长会话进入确认页后，扫码中转任务就完成了。
+    // 及时清除它，避免点击微信原生“回到首页”时又被登录页送回本页。
+    wx.removeStorageSync("pendingCheckinScene");
     this.load();
   },
   load() {
