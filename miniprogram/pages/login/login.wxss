@@ -232,6 +232,7 @@
 .login-main{padding-top:18rpx;text-align:center}
 .phone-symbol{display:flex;align-items:center;justify-content:center;width:90rpx;height:90rpx;margin:0 auto 18rpx;border-radius:28rpx;background:#e1eee8;color:#176f63;font-size:31rpx;font-weight:950}
 .login-title{font-size:31rpx;font-weight:950}
+.account-scope{margin-top:10rpx;color:#66756e;font-size:21rpx;line-height:1.45}
 .login-main>.field{margin-top:22rpx;text-align:left}
 .account-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:24rpx;text-align:left}
 .account-head>text{padding:12rpx;color:#748079;font-size:21rpx}
@@ -240,3 +241,4 @@
 .help-lines>view>text:first-child{color:#176f63;font-weight:900}
 .help-lines>view>text:last-child{color:#6f7b75;font-size:22rpx;line-height:1.5}
 .recovery-button{width:100%;margin-top:12rpx;background:transparent;border-color:transparent;color:#748079;box-shadow:none;font-size:21rpx}
+.guest-return{display:block;width:100%;min-height:80rpx;margin-top:14rpx;border:2rpx solid #d9e2dd;border-radius:16rpx;background:#f5f7f5;color:#315248;font-size:22rpx;line-height:80rpx;text-align:center;box-sizing:border-box}

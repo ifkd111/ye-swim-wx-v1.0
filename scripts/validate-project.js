@@ -34,7 +34,8 @@ function main() {
   assert(exists(qrCodePath), "缺少二维码绘制工具");
 
   const appJson = readJson(appJsonPath);
-  assert(Array.isArray(appJson.pages) && appJson.pages.length === 12, "V2.1.5 应保留 12 个必要页面");
+  assert(Array.isArray(appJson.pages) && appJson.pages.length === 13, "V2.1.8 应保留 13 个必要页面");
+  assert(appJson.pages[0] === "pages/demo/demo", "首页必须先提供免登录功能体验，不能直接要求手机号授权");
 
   appJson.pages.forEach((page) => {
     ["js", "json", "wxml", "wxss"].forEach((ext) => {

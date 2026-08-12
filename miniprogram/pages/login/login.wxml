@@ -9,9 +9,11 @@
 
     <view class="login-main" wx:if="{{mode === 'phone'}}">
       <view class="phone-symbol">微</view><view class="login-title">微信手机号登录</view>
+      <view class="account-scope">仅限老板已登记的老板、教练和家长账号</view>
       <view class="test-panel" wx:if="{{testLogin.enabled}}"><view class="role-grid"><button class="mini" loading="{{loading}}" data-role="admin" bindtap="testLogin">老板</button><button class="mini" loading="{{loading}}" data-role="coach" bindtap="testLogin">教练</button><button class="mini" loading="{{loading}}" data-role="student" bindtap="testLogin">学员</button></view></view>
       <button wx:if="{{useMock && !testLogin.enabled}}" class="primary login-button" loading="{{loading}}" bindtap="phoneLogin">微信手机号登录</button>
       <button wx:if="{{!useMock}}" class="primary login-button" loading="{{loading}}" open-type="getPhoneNumber" bindgetphonenumber="phoneLogin">微信手机号登录</button>
+      <navigator class="guest-return" url="/pages/demo/demo" open-type="reLaunch" aria-label="暂不登录，继续体验功能">暂不登录，继续体验功能</navigator>
       <view class="form-error" wx:if="{{fieldError}}">{{fieldError}}</view>
     </view>
 
@@ -21,6 +23,7 @@
       <view class="field"><text class="field-label">密码</text><input password value="{{password}}" placeholder="请输入密码" confirm-type="done" bindinput="onPasswordInput" bindconfirm="login" /></view>
       <view class="form-error" wx:if="{{fieldError}}">{{fieldError}}</view>
       <button class="primary login-button" loading="{{loading}}" bindtap="login">登录</button>
+      <navigator class="guest-return" url="/pages/demo/demo" open-type="reLaunch" aria-label="返回功能体验">返回功能体验</navigator>
     </view>
   </view>
 

@@ -1,0 +1,50 @@
+<view class="page demo-page">
+  <view class="demo-hero">
+    <view><view class="demo-brand">叶</view><view class="demo-tagline">每一节课，都清清楚楚</view></view>
+    <button class="login-entry" bindtap="goLogin">登录我的账号</button>
+  </view>
+
+  <view class="privacy-note"><text>免登录体验</text><view>以下均为脱敏演示数据，不读取手机号、头像或昵称，也不会写入正式课时。</view></view>
+
+  <view class="demo-tabs" role="tablist">
+    <button class="demo-tab {{mode === item.id ? 'active' : ''}}" wx:for="{{modes}}" wx:key="id" data-mode="{{item.id}}" bindtap="switchMode" role="tab" aria-label="查看{{item.label}}">{{item.label}}</button>
+  </view>
+
+  <block wx:if="{{mode === 'family'}}">
+    <view class="demo-panel" wx:if="{{!receipt}}">
+      <view class="coach-strip"><view class="eyebrow">本次教练</view><view class="demo-coach">示例教练</view><view class="coach-meta">今天 · 确认后记录实际服务器时间</view></view>
+      <view class="panel-head"><view><view class="section-title">谁来上课了？</view><view class="section-note">每名孩子可以分别选择扣课节数</view></view></view>
+      <view class="demo-member {{item.selected ? 'active' : ''}}" wx:for="{{members}}" wx:key="id">
+        <view class="member-head" data-id="{{item.id}}" bindtap="toggleMember" role="button" aria-label="{{item.name}}，{{item.selected ? '已到场' : '未到场'}}">
+          <view><view class="member-name">{{item.name}}</view><view class="member-meta">总 {{item.totalLessons}} · 已上 {{item.usedLessons}} · 剩余 {{item.remainingLessons}}</view></view>
+          <view class="arrival {{item.selected ? 'active' : ''}}">{{item.selected ? '已到场' : '未到场'}}</view>
+        </view>
+        <view class="member-count" wx:if="{{item.selected}}"><text>本次扣课</text><view class="count-options"><button class="count-button {{item.lessons === lesson ? 'active' : ''}}" wx:for="{{lessonOptions}}" wx:for-item="lesson" wx:key="*this" data-id="{{item.id}}" data-value="{{lesson}}" catchtap="chooseLessons" aria-label="{{item.name}}扣{{lesson}}节">{{lesson}} 节</button></view></view>
+      </view>
+      <view class="demo-summary">已选择 {{selectedCount}} 名学员，共扣 {{totalLessons}} 节</view>
+      <button class="primary demo-confirm" disabled="{{!selectedCount}}" bindtap="confirmDemo">模拟确认消课</button>
+    </view>
+
+    <view class="demo-panel receipt-panel" wx:else>
+      <view class="success-ring">完成</view><view class="success-title">模拟消课成功</view><view class="success-note">演示数据没有写入正式系统</view>
+      <view class="receipt-row" wx:for="{{members}}" wx:if="{{item.selected}}" wx:key="id"><view><view class="member-name">{{item.name}}</view><view class="member-meta">本次扣除 {{item.lessons}} 节</view></view><view class="receipt-balance">余 {{item.remainingLessons}} 节</view></view>
+      <button class="primary demo-confirm" bindtap="resetDemo">再体验一次</button>
+    </view>
+  </block>
+
+  <view class="demo-panel" wx:elif="{{mode === 'coach'}}">
+    <view class="panel-head"><view><view class="section-title">今日上课码</view><view class="section-note">每天固定一张，可展示或转发给家长</view></view><view class="status">今日有效</view></view>
+    <view class="code-stage"><view class="code-frame"><view class="code-corner tl"></view><view class="code-corner tr"></view><view class="code-corner bl"></view><view class="code-corner br"></view><view class="code-leaf">叶</view></view></view>
+    <view class="coach-facts"><view><text>有效期</text><text>仅当天</text></view><view><text>扫码结果</text><text>家长确认后消课</text></view><view><text>课时记录</text><text>自动同步老板端</text></view></view>
+  </view>
+
+  <view class="demo-panel" wx:elif="{{mode === 'owner'}}">
+    <view class="panel-head"><view><view class="section-title">今天的消课记录</view><view class="section-note">老板能查看、纠错和撤销</view></view><view class="status">演示</view></view>
+    <view class="owner-metrics"><view><text>3</text><text>今日学员</text></view><view><text>4</text><text>今日扣课</text></view><view><text>2</text><text>上课教练</text></view></view>
+    <view class="owner-log"><view><view class="member-name">示例学员一</view><view class="member-meta">09:30 · 示例教练</view></view><view class="log-lessons">2 节</view></view>
+    <view class="owner-log"><view><view class="member-name">示例学员二</view><view class="member-meta">09:30 · 示例教练</view></view><view class="log-lessons">1 节</view></view>
+    <view class="owner-log"><view><view class="member-name">示例学员三</view><view class="member-meta">11:00 · 老板教练</view></view><view class="log-lessons">1 节</view></view>
+  </view>
+
+  <view class="login-after-demo"><view class="section-title">已经了解怎么用？</view><view class="section-note">登录时才会验证手机号；头像和昵称可进入后自愿设置。</view><button class="primary" bindtap="goLogin">登录查看我的课时</button></view>
+</view>

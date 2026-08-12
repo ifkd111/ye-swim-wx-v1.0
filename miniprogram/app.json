@@ -1,5 +1,6 @@
 {
   "pages": [
+    "pages/demo/demo",
     "pages/login/login",
     "pages/developer/developer",
     "pages/admin/admin",
