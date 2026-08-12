@@ -5,11 +5,11 @@ function envVersion() {
 }
 
 Page({
-  data: { loading: true, invites: [], requests: [], pendingCount: 0, reviewVisible: false, review: null, saving: false },
+  data: { loading: true, loadError: "", invites: [], requests: [], pendingCount: 0, reviewVisible: false, review: null, saving: false },
   onShow() { if (!api.requireSession("admin")) return; this.load(); },
   onPullDownRefresh() { this.load(); },
   load() {
-    this.setData({ loading: true });
+    this.setData({ loading: true, loadError: "" });
     api.call("registrationAdminData", { envVersion: envVersion() }).then((data) => {
       const invites = (data.invites || []).map((item) => Object.assign({}, item, {
         letter: item.inviteType === "coach" ? "A" : "B",
@@ -18,8 +18,9 @@ Page({
       }));
       this.setData({ invites, requests: data.requests || [], pendingCount: data.pendingCount || 0, loading: false });
       wx.stopPullDownRefresh();
-    }).catch((error) => { this.setData({ loading: false }); wx.stopPullDownRefresh(); api.fail(error); });
+    }).catch((error) => { this.setData({ loading: false, loadError: error && error.message ? error.message : "登记信息读取失败" }); wx.stopPullDownRefresh(); });
   },
+  retryLoad() { this.load(); },
   previewInvite(event) {
     const invite = this.data.invites.find((item) => item.inviteType === event.currentTarget.dataset.type);
     if (invite && invite.fileId) wx.previewImage({ urls: [invite.fileId], current: invite.fileId });

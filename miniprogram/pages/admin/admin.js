@@ -4,15 +4,29 @@ const rules = require("../../utils/rules");
 function envVersion() { try { return wx.getAccountInfoSync().miniProgram.envVersion || "release"; } catch (error) { return "release"; } }
 
 Page({
-  data: { viewer: {}, members: [], accounts: [], todayLogs: [], stats: {}, code: null, manualVisible: false, selectedCoach: "", manualMembers: [], lessonOptions: [1, 2, 3], manualLessons: 1, manualDate: "", manualTime: "", manualReason: "", saving: false },
+  data: { viewer: {}, members: [], accounts: [], todayLogs: [], stats: {}, code: null, loading: true, loadError: "", codeLoading: true, codeError: "", manualVisible: false, selectedCoach: "", manualMembers: [], lessonOptions: [1, 2, 3], manualLessons: 1, manualDate: "", manualTime: "", manualReason: "", saving: false },
   onShow() { if (!api.requireSession("admin")) return; this.load(); },
   load() {
-    Promise.all([api.call("consumptionHomeData"), api.call("dailyCoachCode", { envVersion: envVersion() }).catch(() => null)]).then(([data, code]) => {
+    this.setData({ loading: true, loadError: "" });
+    api.call("consumptionHomeData").then((data) => {
       const coaches = (data.accounts || []).filter((item) => item.role === "coach" && item.status !== "disabled");
       const own = { account: data.viewer.account, fullName: data.viewer.fullName || "老板本人", coachName: data.viewer.coachName || data.viewer.fullName || "老板本人", role: "admin" };
-      this.setData({ viewer: data.viewer || {}, members: data.members || [], accounts: [own].concat(coaches), todayLogs: data.todayLogs || [], stats: data.stats || {}, code });
-    }).catch(api.fail);
+      this.setData({ viewer: data.viewer || {}, members: data.members || [], accounts: [own].concat(coaches), todayLogs: data.todayLogs || [], stats: data.stats || {}, loading: false });
+    }).catch((error) => {
+      this.setData({ loading: false, loadError: error && error.message ? error.message : "数据读取失败" });
+    });
+    this.loadCode();
   },
+  loadCode() {
+    this.setData({ codeLoading: true, codeError: "" });
+    api.call("dailyCoachCode", { envVersion: envVersion() }).then((code) => {
+      this.setData({ code, codeLoading: false });
+    }).catch((error) => {
+      this.setData({ code: null, codeLoading: false, codeError: error && error.message ? error.message : "生成失败，请重试" });
+    });
+  },
+  retryLoad() { this.load(); },
+  retryCode() { this.loadCode(); },
   goCoaches() { wx.navigateTo({ url: "/pages/admin-coaches/admin-coaches" }); },
   goMembers() { wx.navigateTo({ url: "/pages/admin-members/admin-members" }); },
   goRegistration() { wx.navigateTo({ url: "/pages/admin-registration/admin-registration" }); },

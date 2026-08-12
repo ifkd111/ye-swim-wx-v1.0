@@ -11,20 +11,25 @@ const testLogin = developerMock
 
 Page({
   data: {
-    mode: "phone",
+    mode: "password",
     account: useMock ? "yeats" : "",
     password: useMock ? "1324" : "",
     phone: testLogin.phone || (useMock ? "13333330002" : ""),
     useMock,
     testLogin,
-    loading: false
+    loading: false,
+    fieldError: ""
   },
 
   onLoad() {
     const session = api.currentSession();
     if (session && session.role) {
       this.routeAfterLogin(session);
+      return;
     }
+    // 扫教练码进来的家长应直接看到微信手机号入口；普通启动优先老板管理，
+    // 既符合老板高频使用，也避免审核员停在无法体验的授权页。
+    if (wx.getStorageSync("pendingCheckinScene")) this.setData({ mode: "phone" });
   },
 
   routeAfterLogin(session) {
@@ -37,11 +42,11 @@ Page({
   },
 
   onAccountInput(event) {
-    this.setData({ account: event.detail.value });
+    this.setData({ account: event.detail.value, fieldError: "" });
   },
 
   onPasswordInput(event) {
-    this.setData({ password: event.detail.value });
+    this.setData({ password: event.detail.value, fieldError: "" });
   },
 
   onPhoneInput(event) {
@@ -49,19 +54,19 @@ Page({
   },
 
   setMode(event) {
-    this.setData({ mode: event.currentTarget.dataset.mode });
+    this.setData({ mode: event.currentTarget.dataset.mode, fieldError: "" });
   },
 
   login() {
     if (this.data.loading) return;
     const account = String(this.data.account || "").trim();
     const password = String(this.data.password || "");
-    if (!account) {
-      api.toast("请输入老板手机号");
+    if (!rules.isChinaMobile(account)) {
+      this.setData({ fieldError: "请输入老板登记的 11 位手机号" });
       return;
     }
     if (!password) {
-      api.toast("请输入老板密码");
+      this.setData({ fieldError: "请输入老板密码" });
       return;
     }
     this.setData({ loading: true });
@@ -101,7 +106,9 @@ Page({
         api.saveSession(result.session);
         this.routeAfterLogin(result.session);
       })
-      .catch(api.fail)
+      .catch((error) => {
+        this.setData({ fieldError: error && error.message ? error.message : "登录失败，请重试" });
+      })
       .finally(() => this.setData({ loading: false }));
   },
 

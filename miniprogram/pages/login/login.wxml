@@ -15,8 +15,8 @@
     <view class="subtitle">老板管理课时，教练展示每日码，家长扫码完成消课。</view>
 
     <view class="login-tabs">
-      <view class="chip {{mode === 'phone' ? 'active' : ''}}" bindtap="setMode" data-mode="phone">教练 / 家长</view>
       <view class="chip {{mode === 'password' ? 'active' : ''}}" bindtap="setMode" data-mode="password">老板管理</view>
+      <view class="chip {{mode === 'phone' ? 'active' : ''}}" bindtap="setMode" data-mode="phone">教练 / 家长</view>
     </view>
 
     <view wx:if="{{mode === 'phone'}}">
@@ -48,13 +48,15 @@
       </view>
       <view class="field">
         <text class="field-label">老板手机号</text>
-        <input value="{{account}}" type="number" maxlength="11" placeholder="请输入老板手机号" bindinput="onAccountInput" />
+        <input value="{{account}}" type="number" maxlength="11" placeholder="请输入老板手机号" confirm-type="next" bindinput="onAccountInput" />
       </view>
       <view class="field">
         <text class="field-label">密码</text>
-        <input password value="{{password}}" placeholder="请输入密码" bindinput="onPasswordInput" />
+        <input password value="{{password}}" placeholder="请输入密码" confirm-type="done" bindinput="onPasswordInput" bindconfirm="login" />
       </view>
+      <view class="form-error" wx:if="{{fieldError}}">{{fieldError}}</view>
       <button class="primary login-button" loading="{{loading}}" bindtap="login">登录</button>
+      <view class="login-tip">老板使用手机号和密码进入；不会绑定当前微信。</view>
     </view>
   </view>
 </view>

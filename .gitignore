@@ -9,6 +9,7 @@ cloudbase.seed.json
 cloudfunctions/api/seed-data.json
 preview-qrcode.jpg
 v2-daily-code-smoke.jpg
+artifacts/review-*/
 ci-quality-report.json
 miniprogram/private.config.json
 miniprogram/miniprogram_npm/

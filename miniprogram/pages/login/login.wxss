@@ -206,6 +206,17 @@
   margin-top: 18rpx;
 }
 
+.form-error {
+  margin-top: 12rpx;
+  padding: 15rpx 18rpx;
+  border: 1rpx solid #efd1cb;
+  border-radius: 14rpx;
+  background: #fff4f1;
+  color: #a34538;
+  font-size: 22rpx;
+  line-height: 1.45;
+}
+
 .role-grid {
   display: flex;
   gap: 12rpx;

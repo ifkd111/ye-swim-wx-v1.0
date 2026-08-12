@@ -5,6 +5,7 @@ const root = path.resolve(__dirname, "..");
 const appJsonPath = path.join(root, "miniprogram", "app.json");
 const projectConfigPath = path.join(root, "project.config.json");
 const cloudApiPath = path.join(root, "cloudfunctions", "api", "index.js");
+const cloudConfigPath = path.join(root, "cloudfunctions", "api", "config.json");
 const envPath = path.join(root, "miniprogram", "env.js");
 const loginWxmlPath = path.join(root, "miniprogram", "pages", "login", "login.wxml");
 const packageJsonPath = path.join(root, "package.json");
@@ -27,6 +28,7 @@ function main() {
   assert(exists(appJsonPath), "缺少 miniprogram/app.json");
   assert(exists(projectConfigPath), "缺少 project.config.json");
   assert(exists(cloudApiPath), "缺少 cloudfunctions/api/index.js");
+  assert(exists(cloudConfigPath), "缺少 cloudfunctions/api/config.json");
   assert(exists(envPath), "缺少 miniprogram/env.js");
   assert(exists(loginWxmlPath), "缺少登录页 WXML");
   assert(exists(qrCodePath), "缺少二维码绘制工具");
@@ -64,6 +66,10 @@ function main() {
   }
 
   const apiSource = fs.readFileSync(cloudApiPath, "utf8");
+  const cloudConfig = readJson(cloudConfigPath);
+  const openapiPermissions = cloudConfig.permissions && cloudConfig.permissions.openapi || [];
+  assert(openapiPermissions.includes("phonenumber.getPhoneNumber"), "云函数缺少微信手机号接口权限");
+  assert(openapiPermissions.includes("wxacode.getUnlimited"), "云函数缺少小程序码生成接口权限");
   const qr = require(qrCodePath);
   const qrMatrix = qr.createMatrix("YS:ABC12345");
   assert(qrMatrix.length === 21 && qrMatrix[0].length === 21, "二维码矩阵尺寸异常");

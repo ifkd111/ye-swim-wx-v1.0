@@ -4,11 +4,22 @@ const rules = require("../../utils/rules");
 function emptyForm() { return { id: "", chineseName: "", phone: "", totalLessons: 0, notes: "" }; }
 
 Page({
-  data: { viewMode: "list", allMembers: [], members: [], keyword: "", form: emptyForm(), saving: false },
+  data: { viewMode: "list", allMembers: [], members: [], visibleMembers: [], keyword: "", renderLimit: 30, hasMore: false, form: emptyForm(), saving: false },
   onShow() { if (!api.requireSession("admin")) return; this.load(); },
   load() { api.call("consumptionHomeData").then((data) => { this.setData({ allMembers: data.members || [] }, () => this.filter()); }).catch(api.fail); },
-  filter() { const key = String(this.data.keyword || "").trim().toLowerCase(); this.setData({ members: this.data.allMembers.filter((item) => !key || [item.chineseName, item.phone, item.notes].some((value) => String(value || "").toLowerCase().indexOf(key) >= 0)) }); },
-  search(event) { this.setData({ keyword: event.detail.value }, () => this.filter()); },
+  filter() {
+    const key = String(this.data.keyword || "").trim().toLowerCase();
+    const members = this.data.allMembers.filter((item) => !key || [item.chineseName, item.phone, item.notes].some((value) => String(value || "").toLowerCase().indexOf(key) >= 0));
+    const renderLimit = this.data.renderLimit || 30;
+    this.setData({ members, visibleMembers: members.slice(0, renderLimit), hasMore: members.length > renderLimit });
+  },
+  search(event) { this.setData({ keyword: event.detail.value, renderLimit: 30 }, () => this.filter()); },
+  loadMore() {
+    if (!this.data.hasMore) return;
+    const renderLimit = Math.min(this.data.members.length, this.data.renderLimit + 30);
+    this.setData({ renderLimit, visibleMembers: this.data.members.slice(0, renderLimit), hasMore: renderLimit < this.data.members.length });
+  },
+  onReachBottom() { this.loadMore(); },
   openCreate() { this.setData({ viewMode: "form", form: emptyForm() }); },
   edit(event) { const member = this.data.allMembers.find((item) => item.id === event.currentTarget.dataset.id); if (!member) return; this.setData({ viewMode: "form", form: { id: member.id, chineseName: member.chineseName || "", phone: member.phone || "", phoneLocked: Boolean(member.phoneLocked), totalLessons: Number(member.totalLessons || 0), notes: member.notes || "" } }); },
   closeForm() { this.setData({ viewMode: "list", form: emptyForm() }); },
