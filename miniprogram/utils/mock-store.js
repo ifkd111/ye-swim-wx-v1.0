@@ -262,6 +262,7 @@ function accountBySession(state, session) {
   if (!account) return null;
   if (session.testLogin) return account;
   if (account.role !== "admin") return account;
+  if (session.authMethod === "phone" || session.loginMode === "phone") return account;
   return (account.passwordSessions || []).indexOf(session.authToken) >= 0 ? account : null;
 }
 
@@ -290,7 +291,7 @@ function memberViews(state, viewer, options) {
       return false;
     })
     .map((member) => {
-      const usedLessons = usedByMember[member.id] || 0;
+      const usedLessons = Number(member.openingUsedLessons || 0) + Number(usedByMember[member.id] || 0);
       const balance = rules.memberStatus(member, usedLessons);
       return Object.assign({}, member, {
         usedLessons,
@@ -764,7 +765,7 @@ function listPagedData(state, viewer, payload) {
 
 function safeAccount(account) {
   const result = clone(account);
-  result.wechatBound = result.role === "admin" ? false : Boolean(result.openid);
+  result.wechatBound = Boolean(result.openid);
   delete result.password;
   delete result.passwordSessions;
   delete result.openid;
@@ -1007,8 +1008,21 @@ function unbindAccountWechat(state, viewer, payload) {
   if (account.role === "admin") throw new Error("老板账号不能在小程序内解除绑定");
   account.openid = null;
   account.bindingStatus = account.phone ? "pending" : "";
+  account.phoneLocked = false;
   account.updatedAt = new Date().toISOString();
   return { message: "已解除旧微信绑定，可用已登记手机号重新登录" };
+}
+
+function saveMyProfile(state, viewer, payload) {
+  assertRole(viewer, ["coach", "student"]);
+  const account = state.accounts.find((item) => item.id === viewer.id || item.account === viewer.account);
+  if (!account) throw new Error("账号不存在");
+  const nickname = String(payload.nickname || "").trim().slice(0, 24);
+  if (!nickname) throw new Error("请填写微信昵称");
+  account.nickname = nickname;
+  if (payload.avatarFileId) account.avatarFileId = String(payload.avatarFileId);
+  account.updatedAt = new Date().toISOString();
+  return { message: "头像和昵称已保存", session: safeAccount(account) };
 }
 
 function login(payload) {
@@ -1042,8 +1056,6 @@ function login(payload) {
     resolvedAccount.phone = adminPhoneToBind;
     resolvedAccount.loginMode = "password";
   }
-  resolvedAccount.openid = null;
-  resolvedAccount.bindingStatus = "";
   const authToken = "mock-admin-" + Date.now() + "-" + Math.random().toString(36).slice(2);
   resolvedAccount.passwordSessions = (resolvedAccount.passwordSessions || []).slice(-4).concat(authToken);
   resolvedAccount.lastLoginAt = new Date().toISOString();
@@ -1066,23 +1078,20 @@ function loginByPhone(payload) {
   if (matches.length > 1) throw new Error("该手机号绑定了多个账号，请联系老板处理");
   const account = matches[0];
   if (!account) throw new Error("该手机号未开通账号，请联系老板绑定");
-  if (account.role === "admin") {
-    throw new Error("老板账号不能使用微信手机号登录，请切换到老板管理并使用手机号和密码");
-  }
-
   const openid = payload.openid || "mock-phone-openid";
-  if (account.openid && account.openid !== openid) {
+  if (account.openid && account.openid !== openid && account.role !== "admin") {
     throw new Error("该手机号账号已经绑定其他微信");
   }
   account.openid = openid;
   account.phoneVerifiedAt = new Date().toISOString();
   account.bindingStatus = "bound";
   account.loginMode = "phone";
+  account.phoneLocked = true;
   account.lastLoginAt = new Date().toISOString();
   account.updatedAt = new Date().toISOString();
   saveState(state);
   return {
-    session: safeAccount(account),
+    session: Object.assign(safeAccount(account), { authMethod: "phone" }),
     message: "手机号验证成功，已绑定当前微信"
   };
 }
@@ -1102,6 +1111,14 @@ function loginForTest(payload) {
       testPhone: phone
     }),
     message: "测试登录成功"
+  };
+}
+
+function developerOverview(state) {
+  return {
+    admins: state.accounts.filter((item) => item.role === "admin" && item.status !== "disabled").map(safeAccount),
+    coaches: state.accounts.filter((item) => item.role === "coach" && item.status !== "disabled").map(safeAccount),
+    students: state.accounts.filter((item) => item.role === "student" && item.status !== "disabled").map(safeAccount)
   };
 }
 
@@ -1567,6 +1584,7 @@ function call(action, payload) {
   if (action === "login") return login(payload || {});
   if (action === "loginByPhone") return loginByPhone(payload || {});
   if (action === "loginForTest") return loginForTest(payload || {});
+  if (action === "developerOverview") return developerOverview(state);
   if (action === "registrationContext") {
     const result = registrationContext(state, payload || {});
     saveState(state);
@@ -1604,6 +1622,7 @@ function call(action, payload) {
   else if (action === "listPagedData") result = listPagedData(state, viewer, payload);
   else if (action === "saveMember") result = saveMember(state, viewer, payload);
   else if (action === "bulkImportMembers") result = bulkImportMembers(state, viewer, payload);
+  else if (action === "saveMyProfile") result = saveMyProfile(state, viewer, payload);
   else if (action === "saveAccount") result = saveAccount(state, viewer, payload);
   else if (action === "resetAccountPassword") result = resetAccountPassword(state, viewer, payload);
   else if (action === "changeMyPassword") result = changeMyPassword(state, viewer, payload);

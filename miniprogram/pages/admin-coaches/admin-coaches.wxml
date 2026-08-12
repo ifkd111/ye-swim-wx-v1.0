@@ -1,8 +1,9 @@
 <view class="page coach-admin-page">
+  <view class="developer-readonly" wx:if="{{readOnly}}"><text>只读</text><view>教练资料仅供查看</view></view>
   <block wx:if="{{viewMode === 'list'}}">
     <view class="app-header">
       <view><view class="eyebrow">人员与登录</view><view class="title">教练</view><view class="subtitle">{{filterStats.active}} 位启用 · {{filterStats.pending}} 位待绑定微信</view></view>
-      <button class="primary mini" bindtap="openCreate">新增教练</button>
+      <button wx:if="{{!readOnly}}" class="primary mini" bindtap="openCreate">新增教练</button>
     </view>
 
     <view class="section filter-section">
@@ -17,13 +18,13 @@
 
     <view class="coach-card" wx:for="{{coaches}}" wx:key="id" data-id="{{item.id}}" bindtap="editCoach">
       <view class="coach-card-head">
-        <view class="coach-identity"><view class="coach-list-avatar">{{item.initial}}</view><view><view class="coach-list-name">{{item.coachName}}</view><view class="coach-account">{{item.account}}</view></view></view>
+        <view class="coach-identity"><image wx:if="{{item.avatarFileId}}" class="coach-list-avatar" src="{{item.avatarFileId}}" mode="aspectFill"></image><view wx:else class="coach-list-avatar">{{item.initial}}</view><view><view class="coach-list-name">{{item.coachName}}</view><view class="coach-account">{{item.nickname || item.account}}</view></view></view>
         <text class="status {{item.status === 'disabled' ? 'muted' : item.wechatBound ? '' : 'warn'}}">{{item.status === 'disabled' ? '已停用' : item.bindingText}}</text>
       </view>
       <view class="coach-facts">
         <view><text class="fact-value">{{item.phone || '未登记'}}</text><text class="fact-label">登录手机号</text></view>
       </view>
-      <view class="card-actions">
+      <view class="card-actions" wx:if="{{!readOnly}}">
         <text class="edit-link">编辑资料</text>
         <button wx:if="{{item.wechatBound}}" class="block-button quiet" data-id="{{item.id}}" catchtap="unbindWechat">解除微信</button>
         <button class="block-button {{item.status === 'disabled' ? '' : 'danger-lite'}}" data-id="{{item.id}}" catchtap="toggleCoach">{{item.status === 'disabled' ? '启用' : '停用'}}</button>
@@ -33,7 +34,7 @@
   </block>
 
   <block wx:else>
-    <view class="form-header"><text bindtap="closeForm">‹ 返回教练列表</text><view class="title">{{form.id ? '编辑教练' : '新增教练'}}</view><view class="subtitle">老板绑定手机号后，教练输入此号码即可验证进入教练端</view></view>
+    <view class="form-header"><text bindtap="closeForm">‹ 返回教练列表</text><view class="title">{{form.id ? '编辑教练' : '新增教练'}}</view></view>
     <view class="section coach-form">
       <view class="account-strip"><text>登录账号</text><text>{{form.account}}</text></view>
       <view class="field"><text class="field-label">教练姓名</text><input value="{{form.fullName}}" placeholder="例如：张教练" data-field="fullName" bindinput="input" /></view>

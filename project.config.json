@@ -10,7 +10,6 @@
       { "type": "folder", "value": "pages/admin-availability" },
       { "type": "folder", "value": "pages/admin-bookings" },
       { "type": "folder", "value": "pages/admin-course-applications" },
-      { "type": "folder", "value": "pages/admin-import" },
       { "type": "folder", "value": "pages/admin-leave" },
       { "type": "folder", "value": "pages/admin-schedule" },
       { "type": "folder", "value": "pages/admin-staff" },

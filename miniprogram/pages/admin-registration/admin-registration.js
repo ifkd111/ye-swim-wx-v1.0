@@ -5,8 +5,8 @@ function envVersion() {
 }
 
 Page({
-  data: { loading: true, loadError: "", invites: [], requests: [], pendingCount: 0, reviewVisible: false, review: null, saving: false },
-  onShow() { if (!api.requireSession("admin")) return; this.load(); },
+  data: { loading: true, loadError: "", invites: [], requests: [], pendingCount: 0, reviewVisible: false, review: null, saving: false, readOnly: false },
+  onShow() { const session = api.requireSession("admin"); if (!session) return; this.setData({ readOnly: Boolean(session.developerReadOnly) }); this.load(); },
   onPullDownRefresh() { this.load(); },
   load() {
     this.setData({ loading: true, loadError: "" });
@@ -21,11 +21,21 @@ Page({
     }).catch((error) => { this.setData({ loading: false, loadError: error && error.message ? error.message : "登记信息读取失败" }); wx.stopPullDownRefresh(); });
   },
   retryLoad() { this.load(); },
+  focusQr() { wx.pageScrollTo({ scrollTop: 330, duration: 220 }); },
+  goImport() { wx.navigateTo({ url: "/pages/admin-import/admin-import" }); },
+  openManualCreate() {
+    if (this.data.readOnly) return api.toast("开发者视角为只读");
+    wx.showActionSheet({
+      itemList: ["手动新增教练", "手动新增学员"],
+      success: (res) => wx.navigateTo({ url: res.tapIndex === 0 ? "/pages/admin-coaches/admin-coaches?create=1" : "/pages/admin-members/admin-members?create=1" })
+    });
+  },
   previewInvite(event) {
     const invite = this.data.invites.find((item) => item.inviteType === event.currentTarget.dataset.type);
     if (invite && invite.fileId) wx.previewImage({ urls: [invite.fileId], current: invite.fileId });
   },
   rotateInvite(event) {
+    if (this.data.readOnly) return api.toast("开发者视角为只读");
     const inviteType = event.currentTarget.dataset.type;
     const label = inviteType === "coach" ? "教练码 A" : "学员码 B";
     wx.showModal({ title: "更换" + label, content: "更换后，群里之前发过的旧码会立即失效。确定继续？", confirmText: "确认更换", confirmColor: "#a84b40", success: (res) => {
@@ -35,6 +45,7 @@ Page({
     } });
   },
   openReview(event) {
+    if (this.data.readOnly) return;
     const request = this.data.requests.find((item) => item.id === event.currentTarget.dataset.id);
     if (!request) return;
     this.setData({ reviewVisible: true, review: {
@@ -42,7 +53,6 @@ Page({
       requestType: request.requestType,
       phone: request.phone,
       displayName: "",
-      campus: "",
       submittedAt: request.submittedAt,
       children: (request.children || []).map((item) => ({ clientId: item.clientId, proposedName: item.proposedName, remainingLessons: String(item.remainingLessons) }))
     } });
@@ -64,7 +74,6 @@ Page({
     const payload = { requestId: review.id, decision: "approve" };
     if (review.requestType === "coach") {
       payload.displayName = String(review.displayName || "").trim();
-      payload.campus = String(review.campus || "").trim();
       if (!payload.displayName) return api.toast("请填写教练姓名");
     } else {
       try {

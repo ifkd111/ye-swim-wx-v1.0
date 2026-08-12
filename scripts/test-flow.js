@@ -81,26 +81,34 @@ function main() {
     }
   }).account;
   assert.strictEqual(adminWithPhone.phone, "13333330000", "老板账号应能绑定手机号");
-  assert.throws(
-    () => loginByPhone("13333330000", "mistaken-owner-wechat"),
-    /老板账号不能使用微信手机号登录/,
-    "老板误点微信手机号入口时必须被拒绝"
-  );
-  const storedAdminAfterMistake = mock.loadState().accounts.find((item) => item.account === "yeats");
-  assert.strictEqual(storedAdminAfterMistake.openid, null, "老板误点微信手机号入口后仍不能产生微信绑定");
+  const adminByWechat = loginByPhone("13333330000", "owner-wechat");
+  assert.strictEqual(adminByWechat.role, "admin", "老板应能通过统一微信手机号入口自动进入老板端");
+  assert.strictEqual(adminByWechat.wechatBound, true, "老板首次微信手机号登录应完成微信绑定");
+  assert.strictEqual(adminByWechat.authMethod, "phone", "老板微信手机号登录应使用微信会话");
+  const reboundAdmin = loginByPhone("13333330000", "owner-new-wechat");
+  assert.strictEqual(reboundAdmin.role, "admin", "老板在新微信上验证同一手机号后应仍进入老板端");
+  const storedAdminAfterRebind = mock.loadState().accounts.find((item) => item.account === "yeats");
+  assert.strictEqual(storedAdminAfterRebind.openid, "owner-new-wechat", "老板可用已验证手机号安全换绑当前微信");
   const adminByPhone = login("13333330000", "1324", adminOpenid);
   assert.strictEqual(adminByPhone.role, "admin", "老板应能用手机号加密码登录");
-  call(admin, "saveAccount", {
-    account: {
-      id: admin.id,
-      account: "yeats",
-      fullName: "管理员",
-      phone: "",
-      password: "1324"
-    }
-  });
-  const autoBoundAdmin = login("13333330003", "1324", adminOpenid);
-  assert.strictEqual(autoBoundAdmin.phone, "13333330003", "老板首次手机号登录应自动绑定手机号");
+  assert.strictEqual(
+    mock.loadState().accounts.find((item) => item.account === "yeats").openid,
+    "owner-new-wechat",
+    "老板使用应急密码登录不能清除已经建立的微信绑定"
+  );
+  assert.throws(
+    () => call(admin, "saveAccount", {
+      account: {
+        id: admin.id,
+        account: "yeats",
+        fullName: "管理员",
+        phone: "13333330003",
+        password: "1324"
+      }
+    }),
+    /手机号来自微信验证，不能修改/,
+    "老板完成微信手机号验证后，后台不能误改登录手机号"
+  );
   assert.throws(
     () => login("13333330002", "1234"),
     /手机号验证登录/,

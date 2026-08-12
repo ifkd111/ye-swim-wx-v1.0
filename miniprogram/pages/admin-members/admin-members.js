@@ -53,18 +53,30 @@ Page({
     allPageSelected: false,
     form: emptyForm(),
     saving: false,
-    batchSaving: false
+    batchSaving: false,
+    readOnly: false
   },
 
-  onShow() { if (!api.requireSession("admin")) return; this.load(); },
+  onLoad(options) { this.createAfterLoad = Boolean(options && options.create === "1"); },
+  onShow() { const session = api.requireSession("admin"); if (!session) return; this.setData({ readOnly: Boolean(session.developerReadOnly) }); this.load(); },
 
   load() {
     api.call("consumptionHomeData", { includeArchived: true }).then((data) => {
+      const guardianByMember = {};
+      (data.accounts || []).filter((account) => account.role === "student").forEach((account) => {
+        [].concat(account.memberIds || [], account.memberId || []).filter(Boolean).forEach((id) => { guardianByMember[String(id)] = account; });
+      });
       const allMembers = (data.members || []).map((item) => Object.assign({}, item, {
         initial: pinyinInitial(item.chineseName),
-        phoneText: phoneText(item.phone)
+        phoneText: phoneText(item.phone),
+        guardianAvatar: guardianByMember[String(item.id)] && guardianByMember[String(item.id)].avatarFileId || "",
+        guardianNickname: guardianByMember[String(item.id)] && guardianByMember[String(item.id)].nickname || "",
+        guardianWechatBound: Boolean(guardianByMember[String(item.id)] && guardianByMember[String(item.id)].wechatBound)
       }));
-      this.setData({ allMembers }, () => this.filter(true));
+      this.setData({ allMembers }, () => {
+        this.filter(true);
+        if (this.createAfterLoad) { this.createAfterLoad = false; this.openCreate(); }
+      });
     }).catch(api.fail);
   },
 
@@ -108,6 +120,7 @@ Page({
   nextPage() { if (this.data.page >= this.data.totalPages) return; this.setData({ page: this.data.page + 1 }, () => this.paginate()); },
 
   toggleBatch() {
+    if (this.data.readOnly) return api.toast("开发者视角为只读");
     this.setData({ batchMode: !this.data.batchMode, selectedIds: [] }, () => this.paginate());
   },
 
@@ -154,8 +167,9 @@ Page({
     });
   },
 
-  openCreate() { this.setData({ viewMode: "form", form: emptyForm() }); },
+  openCreate() { if (this.data.readOnly) return api.toast("开发者视角为只读"); this.setData({ viewMode: "form", form: emptyForm() }); },
   editById(id) {
+    if (this.data.readOnly) return;
     const member = this.data.allMembers.find((item) => item.id === id);
     if (!member) return;
     this.setData({ viewMode: "form", form: {
@@ -191,6 +205,7 @@ Page({
   },
 
   addLessons(event) {
+    if (this.data.readOnly) return api.toast("开发者视角为只读");
     const id = event.currentTarget.dataset.id;
     const member = this.data.allMembers.find((item) => item.id === id);
     if (!member) return;

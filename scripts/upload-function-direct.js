@@ -116,28 +116,13 @@ async function main() {
       },
       opts
     );
-  } else {
-    try {
-      await cloudAPI.scfUpdateFunctionInfo(
-        {
-          functionName: name,
-          namespace: env,
-          region,
-          memorySize: 256,
-          timeout: 60,
-          installDependency,
-          environment: {
-            variables: securityVariables()
-          }
-        },
-        opts
-      );
-    } catch (error) {
-      console.warn("云函数配置更新失败，继续上传代码：", error.message || error);
-    }
   }
 
-  const zipped = zipFile(functionPath);
+  // 已存在的函数只更新代码，避免覆盖控制台中保存的种子密钥等安全变量。
+  // 远程安装依赖时不上传本地 node_modules，可显著减小上传包并降低断线概率。
+  const zipped = zipFile(functionPath, {
+    ignore: installDependency ? ["node_modules/**"] : []
+  });
   const buffer = await zipToBuffer(zipped);
   await cloudAPI.scfUpdateFunction(
     {

@@ -2,6 +2,7 @@ const cloud = require("wx-server-sdk");
 const crypto = require("crypto");
 const rules = require("./rules");
 const auth = require("./auth");
+const peopleImport = require("./people-import");
 
 cloud.init({ env: cloud.DYNAMIC_CURRENT_ENV });
 
@@ -9,6 +10,9 @@ const db = cloud.database();
 const _ = db.command;
 const TEST_LOGIN_ENABLED = process.env.YE_SWIM_ENABLE_TEST_LOGIN === "true";
 const DEV_TEST_PHONE = rules.normalizePhone(process.env.YE_SWIM_TEST_PHONE || "");
+const DEVELOPER_PHONE = rules.normalizePhone(process.env.YE_SWIM_DEVELOPER_PHONE || "13818793977");
+const DEVELOPER_ACCOUNT = "developer_vv";
+const FUNCTION_VERSION = require("./package.json").version;
 const ALLOW_ADMIN_BOOTSTRAP = auth.envFlag(process.env, "YE_SWIM_ALLOW_ADMIN_BOOTSTRAP");
 const SEED_IMPORT_ENABLED = auth.envFlag(process.env, "YE_SWIM_ENABLE_SEED_IMPORT");
 const PASSWORD_SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -116,7 +120,7 @@ async function findOneByAnyId(collection, id) {
 
 function safeAccount(account) {
   const result = withId(account);
-  result.wechatBound = result.role === "admin" ? false : Boolean(result.openid);
+  result.wechatBound = Boolean(result.openid);
   delete result.passwordHash;
   delete result.passwordSalt;
   delete result.passwordSessions;
@@ -191,8 +195,26 @@ async function getAccountBySession(session, wxContext) {
   const account = await getAccountByName(session.account);
   if (!account) return null;
   if (TEST_LOGIN_ENABLED && DEV_TEST_PHONE && session.testLogin && session.testPhone === DEV_TEST_PHONE) return account;
+  if (account.role === "developer") {
+    if (!auth.isWechatSessionBound(account, wxContext)) return null;
+    const viewRole = String(session.viewRole || "");
+    const targetAccount = rules.normalizeAccount(session.targetAccount);
+    if (!viewRole || !targetAccount) return Object.assign({}, account, {
+      developerReadOnly: true,
+      developerAccount: account.account,
+      developerPhone: account.phone
+    });
+    const target = await getAccountByName(targetAccount);
+    if (!target || target.role !== viewRole || ["admin", "coach", "student"].indexOf(viewRole) < 0) return account;
+    return Object.assign({}, target, {
+      developerReadOnly: true,
+      developerAccount: account.account,
+      developerPhone: account.phone
+    });
+  }
   if (account.role === "admin") {
-    return auth.isPasswordSessionValid(account, session.authToken) ? account : null;
+    if (auth.isPasswordSessionValid(account, session.authToken)) return account;
+    return auth.isWechatSessionBound(account, wxContext) ? account : null;
   }
   return auth.isWechatSessionBound(account, wxContext) ? account : null;
 }
@@ -387,8 +409,6 @@ async function login(payload, wxContext) {
   if (!role || role !== account.role) throw new Error("账号角色配置不正确");
   const passwordSession = createPasswordSession(account);
   const loginPatch = {
-    openid: null,
-    bindingStatus: "",
     passwordSessions: passwordSession.sessions,
     lastLoginAt: nowIso(),
     updatedAt: nowIso()
@@ -417,18 +437,45 @@ async function loginByPhone(payload, wxContext) {
   if (expectedPhone && !auth.verifiedPhoneMatches(expectedPhone, phone)) {
     throw new Error("微信授权手机号与输入号码不一致，请使用老板登记的手机号");
   }
+  if (DEVELOPER_PHONE && phone === DEVELOPER_PHONE) {
+    let developer = await getAccountByName(DEVELOPER_ACCOUNT);
+    const patch = {
+      account: DEVELOPER_ACCOUNT,
+      role: "developer",
+      fullName: "开发者",
+      phone,
+      phoneLocked: true,
+      openid: currentOpenid,
+      phoneVerifiedAt: nowIso(),
+      bindingStatus: "bound",
+      loginMode: "phone",
+      status: "active",
+      lastLoginAt: nowIso(),
+      updatedAt: nowIso()
+    };
+    if (developer) {
+      await db.collection("accounts").doc(docKey(developer)).update({ data: patch });
+      developer = Object.assign({}, developer, patch);
+    } else {
+      patch.createdAt = nowIso();
+      const created = await db.collection("accounts").add({ data: patch });
+      developer = Object.assign({ _id: created._id }, patch);
+    }
+    return {
+      session: Object.assign(safeAccount(developer), { developerReadOnly: true }),
+      message: "开发者身份验证成功"
+    };
+  }
   const account = await getAccountByPhone(phone);
   if (!account) throw new Error("该手机号未开通账号，请联系老板绑定");
-  if (account.role === "admin") {
-    throw new Error("老板账号不能使用微信手机号登录，请切换到老板管理并使用手机号和密码");
-  }
-  if (account.openid && account.openid !== wxContext.OPENID) throw new Error("该手机号账号已经绑定其他微信");
+  if (account.openid && account.openid !== wxContext.OPENID && account.role !== "admin") throw new Error("该手机号账号已经绑定其他微信");
 
   const patch = {
     openid: currentOpenid,
     phoneVerifiedAt: nowIso(),
     bindingStatus: "bound",
     loginMode: "phone",
+    phoneLocked: true,
     lastLoginAt: nowIso(),
     updatedAt: nowIso()
   };
@@ -438,6 +485,35 @@ async function loginByPhone(payload, wxContext) {
     session: safeAccount(Object.assign({}, account, patch)),
     message: "手机号验证成功，已绑定当前微信"
   };
+}
+
+async function developerOverview(viewer) {
+  if (!viewer || (viewer.role !== "developer" && !viewer.developerReadOnly)) throw new Error("没有权限查看开发者入口");
+  const accounts = await list("accounts", { status: _.neq("disabled") }, 1500);
+  return {
+    admins: accounts.filter((item) => item.role === "admin").map(safeAccount),
+    coaches: accounts.filter((item) => item.role === "coach").map(safeAccount),
+    students: accounts.filter((item) => item.role === "student").map(safeAccount)
+  };
+}
+
+async function developerSwitchRole(viewer, payload) {
+  if (!viewer || (viewer.role !== "developer" && !viewer.developerReadOnly)) throw new Error("没有权限切换视角");
+  const developerAccount = viewer.role === "developer" ? viewer.account : viewer.developerAccount;
+  const developer = await getAccountByName(developerAccount);
+  if (!developer || developer.role !== "developer") throw new Error("开发者身份已失效");
+  const targetAccount = rules.normalizeAccount(payload.targetAccount);
+  const target = await getAccountByName(targetAccount);
+  if (!target || ["admin", "coach", "student"].indexOf(target.role) < 0) throw new Error("选择的账号不可预览");
+  const session = Object.assign(safeAccount(target), {
+    account: developer.account,
+    role: target.role,
+    targetAccount: target.account,
+    viewRole: target.role,
+    developerReadOnly: true,
+    developerAccount: developer.account
+  });
+  return { message: "已进入只读视角", session };
 }
 
 async function loginForTest(payload) {
@@ -485,7 +561,7 @@ async function memberViews(viewer, options) {
 
   return loadedMembers.filter((member) => includeArchived || !member.archivedAt).map((member) => {
     const key = docKey(member);
-    const usedLessons = rawDocKeys(member).reduce((sum, id) => sum + Number(usedByMember[id] || 0), 0);
+    const usedLessons = Number(member.openingUsedLessons || 0) + rawDocKeys(member).reduce((sum, id) => sum + Number(usedByMember[id] || 0), 0);
     const balance = rules.memberStatus(member, usedLessons);
     return Object.assign({}, member, {
       id: key,
@@ -870,6 +946,260 @@ async function bulkImportMembers(viewer, payload) {
   return { message: "已导入：新增 " + created + "，更新 " + updated + "，跳过 " + skipped, created, updated, skipped };
 }
 
+function importFileName(payload) {
+  const name = String(payload.fileName || "").trim();
+  if (!/\.(xlsx|xls|csv|et)$/i.test(name)) throw new Error("仅支持 XLSX、XLS、CSV 或 WPS ET 文件");
+  return name;
+}
+
+async function downloadPeopleImport(payload) {
+  const fileId = String(payload.fileId || "").trim();
+  if (!/^cloud:\/\//.test(fileId)) throw new Error("导入文件地址无效，请重新选择表格");
+  const fileName = importFileName(payload);
+  const downloaded = await cloud.downloadFile({ fileID: fileId });
+  const buffer = downloaded && downloaded.fileContent;
+  if (!buffer || !buffer.length) throw new Error("导入文件为空");
+  if (buffer.length > 10 * 1024 * 1024) throw new Error("表格不能超过 10MB");
+  return { fileId, fileName, buffer };
+}
+
+function activeLogUsage(logs) {
+  const used = {};
+  (logs || []).forEach((log) => {
+    if (log.status === "reversed" || log.reversedAt) return;
+    const lessons = Number(log.lessonsDeducted);
+    used[String(log.memberId || "")] = (used[String(log.memberId || "")] || 0) + (lessons > 0 ? lessons : 1);
+  });
+  return used;
+}
+
+function memberAttendanceUsed(member, usedById) {
+  return rawDocKeys(member).reduce((sum, id) => sum + Number(usedById[String(id)] || 0), 0);
+}
+
+async function preparePeopleImport(viewer, payload) {
+  assertRole(viewer, ["admin"]);
+  const file = await downloadPeopleImport(payload);
+  const parsed = peopleImport.parseWorkbook(file.buffer, file.fileName);
+  const [accounts, members, attendanceLogs] = await Promise.all([
+    list("accounts", {}, 1500),
+    list("members", {}, 2000),
+    list("attendanceLogs", {}, 2000)
+  ]);
+  const usedById = activeLogUsage(attendanceLogs);
+  const accountByPhone = {};
+  accounts.forEach((account) => { if (account.phone) accountByPhone[rules.normalizePhone(account.phone)] = account; });
+  const memberByKey = {};
+  members.forEach((member) => {
+    const phone = rules.normalizePhone(member.phone);
+    if (phone && member.chineseName) memberByKey[phone + "|" + String(member.chineseName).trim()] = member;
+  });
+  const errors = parsed.errors.slice();
+  const coaches = parsed.coaches.map((row) => {
+    const existing = accountByPhone[row.phone];
+    if (existing && existing.role !== "coach") errors.push({ kind: "coach", rowNumber: row.rowNumber, name: row.name, message: "该手机号已是家长或老板账号" });
+    return Object.assign({}, row, { action: existing && existing.role === "coach" ? "update" : "create" });
+  });
+  const students = parsed.students.map((row) => {
+    const account = accountByPhone[row.phone];
+    const existing = memberByKey[row.phone + "|" + row.name];
+    if (account && account.role !== "student") errors.push({ kind: "student", rowNumber: row.rowNumber, name: row.name, message: "该手机号已是教练或老板账号" });
+    if (existing && row.usedLessons < memberAttendanceUsed(existing, usedById)) {
+      errors.push({ kind: "student", rowNumber: row.rowNumber, name: row.name, message: "已上课时不能少于系统中已有的有效消课记录" });
+    }
+    return Object.assign({}, row, { action: existing ? "update" : "create" });
+  });
+  const summary = {
+    coachTotal: coaches.length,
+    coachCreate: coaches.filter((row) => row.action === "create").length,
+    coachUpdate: coaches.filter((row) => row.action === "update").length,
+    studentTotal: students.length,
+    studentCreate: students.filter((row) => row.action === "create").length,
+    studentUpdate: students.filter((row) => row.action === "update").length,
+    errorCount: errors.length,
+    warningCount: parsed.warnings.length
+  };
+  return { fileId: file.fileId, fileName: file.fileName, sheets: parsed.sheets, coaches, students, errors, warnings: parsed.warnings, summary, accounts, members, usedById };
+}
+
+function publicPeopleImport(plan) {
+  return {
+    fileId: plan.fileId,
+    fileName: plan.fileName,
+    sheets: plan.sheets,
+    coaches: plan.coaches,
+    students: plan.students,
+    errors: plan.errors,
+    warnings: plan.warnings,
+    summary: plan.summary
+  };
+}
+
+async function previewPeopleImport(viewer, payload) {
+  return publicPeopleImport(await preparePeopleImport(viewer, payload));
+}
+
+async function confirmPeopleImport(viewer, payload) {
+  const plan = await preparePeopleImport(viewer, payload);
+  if (plan.errors.length) throw new Error("表格还有 " + plan.errors.length + " 处错误，请修改后重新上传");
+  const importedAt = nowIso();
+  const accounts = plan.accounts.slice();
+  let nextNo = (await maxMemberNo()) + 1;
+  let coachCreated = 0;
+  let coachUpdated = 0;
+  let studentCreated = 0;
+  let studentUpdated = 0;
+
+  for (const row of plan.coaches) {
+    const existing = accounts.find((item) => item.role === "coach" && rules.normalizePhone(item.phone) === row.phone);
+    if (existing) {
+      await db.collection("accounts").doc(docKey(existing)).update({ data: {
+        fullName: row.name,
+        coachName: row.name,
+        status: row.status,
+        notes: row.notes,
+        updatedAt: importedAt
+      } });
+      existing.fullName = row.name;
+      existing.coachName = row.name;
+      existing.status = row.status;
+      coachUpdated += 1;
+    } else {
+      const account = {
+        account: await nextCoachAccountName(accounts),
+        role: "coach",
+        fullName: row.name,
+        coachName: row.name,
+        phone: row.phone,
+        phoneLocked: false,
+        notes: row.notes,
+        registrationSource: "spreadsheet_import",
+        loginMode: "phone",
+        bindingStatus: "pending",
+        openid: null,
+        status: row.status,
+        createdAt: importedAt,
+        updatedAt: importedAt
+      };
+      const result = await db.collection("accounts").add({ data: account });
+      accounts.push(Object.assign({ _id: result._id }, account));
+      coachCreated += 1;
+    }
+  }
+
+  const linkedByPhone = {};
+  for (const row of plan.students) {
+    const existing = plan.members.find((item) => rules.normalizePhone(item.phone) === row.phone && String(item.chineseName || "").trim() === row.name);
+    let memberId;
+    if (existing) {
+      const logUsed = memberAttendanceUsed(existing, plan.usedById);
+      await db.collection("members").doc(docKey(existing)).update({ data: {
+        chineseName: row.name,
+        phone: row.phone,
+        totalLessons: row.totalLessons,
+        openingUsedLessons: Math.max(0, row.usedLessons - logUsed),
+        notes: row.notes,
+        updatedAt: importedAt
+      } });
+      memberId = docKey(existing);
+      studentUpdated += 1;
+    } else {
+      const member = {
+        memberNo: nextNo,
+        chineseName: row.name,
+        phone: row.phone,
+        phoneLocked: false,
+        registrationSource: "spreadsheet_import",
+        productId: "",
+        productName: "",
+        productType: "",
+        totalLessons: row.totalLessons,
+        openingUsedLessons: row.usedLessons,
+        wechat: "",
+        campus: "",
+        coach: "",
+        cardExpireDate: "",
+        notes: row.notes,
+        createdAt: importedAt,
+        updatedAt: importedAt
+      };
+      const result = await db.collection("members").add({ data: member });
+      memberId = result._id;
+      nextNo += 1;
+      studentCreated += 1;
+    }
+    linkedByPhone[row.phone] = uniqueValues((linkedByPhone[row.phone] || []).concat(memberId));
+  }
+
+  for (const phone of Object.keys(linkedByPhone)) {
+    const idsToAdd = linkedByPhone[phone];
+    const existing = accounts.find((item) => item.role === "student" && rules.normalizePhone(item.phone) === phone);
+    const names = plan.students.filter((row) => row.phone === phone).map((row) => row.name);
+    if (existing) {
+      const memberIds = uniqueValues(linkedMemberIds(existing).concat(idsToAdd));
+      await db.collection("accounts").doc(docKey(existing)).update({ data: {
+        memberId: memberIds[0],
+        memberIds,
+        status: "active",
+        updatedAt: importedAt
+      } });
+      existing.memberId = memberIds[0];
+      existing.memberIds = memberIds;
+    } else {
+      const account = {
+        account: await nextStudentAccountName(accounts),
+        role: "student",
+        fullName: uniqueValues(names).join("、") + "家长",
+        phone,
+        phoneLocked: false,
+        memberId: idsToAdd[0],
+        memberIds: idsToAdd,
+        registrationSource: "spreadsheet_import",
+        loginMode: "phone",
+        bindingStatus: "pending",
+        openid: null,
+        status: "active",
+        createdAt: importedAt,
+        updatedAt: importedAt
+      };
+      const result = await db.collection("accounts").add({ data: account });
+      accounts.push(Object.assign({ _id: result._id }, account));
+    }
+  }
+
+  await createCollectionIfNeeded("auditLogs");
+  await db.collection("auditLogs").add({ data: {
+    action: "import_people_spreadsheet",
+    fileName: plan.fileName,
+    coachCreated,
+    coachUpdated,
+    studentCreated,
+    studentUpdated,
+    operator: viewer.account,
+    createdAt: importedAt
+  } });
+  await cloud.deleteFile({ fileList: [plan.fileId] }).catch(() => null);
+  return {
+    message: "导入完成：教练 " + (coachCreated + coachUpdated) + " 位，学员 " + (studentCreated + studentUpdated) + " 名",
+    coachCreated,
+    coachUpdated,
+    studentCreated,
+    studentUpdated
+  };
+}
+
+async function saveMyProfile(viewer, payload) {
+  assertRole(viewer, ["coach", "student"]);
+  const nickname = String(payload.nickname || "").trim().slice(0, 24);
+  const avatarFileId = String(payload.avatarFileId || "").trim();
+  if (!nickname) throw new Error("请填写微信昵称");
+  if (avatarFileId && !/^cloud:\/\//.test(avatarFileId)) throw new Error("头像文件地址无效");
+  const patch = { nickname, updatedAt: nowIso() };
+  if (avatarFileId) patch.avatarFileId = avatarFileId;
+  await db.collection("accounts").doc(docKey(viewer)).update({ data: patch });
+  return { message: "头像和昵称已保存", session: safeAccount(Object.assign({}, viewer, patch)) };
+}
+
 async function saveAccount(viewer, payload) {
   assertRole(viewer, ["admin"]);
   const raw = payload.account || payload;
@@ -1023,6 +1353,7 @@ async function unbindAccountWechat(viewer, payload) {
     data: {
       openid: null,
       bindingStatus: account.phone ? "pending" : "",
+      phoneLocked: false,
       updatedAt: nowIso()
     }
   });
@@ -1784,8 +2115,17 @@ function publicRegistrationRequest(item) {
 async function registrationAdminData(viewer, payload) {
   assertRole(viewer, ["admin"]);
   const envVersion = registrationEnvVersion(payload.envVersion);
-  const coachInvite = await ensureRegistrationInvite("coach", envVersion, viewer.account);
-  const studentInvite = await ensureRegistrationInvite("student", envVersion, viewer.account);
+  let coachInvite;
+  let studentInvite;
+  if (viewer.developerReadOnly) {
+    const existing = await list("registrationInvites", { status: "active" }, 20).catch((error) => isMissingCollectionError(error) ? [] : Promise.reject(error));
+    coachInvite = existing.find((item) => item.inviteType === "coach") || { inviteType: "coach", token: "", fileIds: {} };
+    studentInvite = existing.find((item) => item.inviteType === "student") || { inviteType: "student", token: "", fileIds: {} };
+    [coachInvite, studentInvite].forEach((invite) => { invite.fileId = invite.fileIds && invite.fileIds[envVersion] || ""; invite.envVersion = envVersion; });
+  } else {
+    coachInvite = await ensureRegistrationInvite("coach", envVersion, viewer.account);
+    studentInvite = await ensureRegistrationInvite("student", envVersion, viewer.account);
+  }
   await createCollectionIfNeeded("registrationRequests");
   const requests = (await list("registrationRequests", { status: "pending" }, 500))
     .map(publicRegistrationRequest)
@@ -1841,7 +2181,7 @@ async function reviewRegistration(viewer, payload) {
     if (!displayName) throw new Error("请填写教练姓名");
     account = {
       account: await nextCoachAccountName(accounts), role: "coach", fullName: displayName, coachName: displayName,
-      campus: String(payload.campus || "").trim(), phone: request.phone, phoneLocked: true,
+      campus: "", phone: request.phone, phoneLocked: true,
       registrationSource: "self_registration", loginMode: "phone", bindingStatus: "pending", openid: null,
       status: "active", createdAt: approvedAt, updatedAt: approvedAt
     };
@@ -1882,6 +2222,7 @@ async function dailyCoachCode(viewer, payload) {
   let rows = await list("dailyCoachCodes", { coachAccount: identity.coachAccount, codeDate: date }, 1);
   let code = rows[0] || null;
   if (!code) {
+    if (viewer.developerReadOnly) return { token: "", codeDate: date, coachAccount: identity.coachAccount, coachName: identity.coachName, status: "missing", envVersion: payload.envVersion, fileId: "" };
     code = {
       token: crypto.randomBytes(10).toString("hex"),
       codeDate: date,
@@ -1897,6 +2238,7 @@ async function dailyCoachCode(viewer, payload) {
   const envVersion = ["develop", "trial", "release"].indexOf(payload.envVersion) >= 0 ? payload.envVersion : "release";
   const storedFiles = Object.assign({}, code.fileIds || {});
   if (!storedFiles[envVersion]) {
+    if (viewer.developerReadOnly) return Object.assign(withId(code), { envVersion, fileId: "" });
     const image = await cloud.openapi.wxacode.getUnlimited({
       scene: "t=" + code.token,
       page: "pages/checkin/checkin",
@@ -2107,6 +2449,7 @@ exports.main = async (event) => {
 
     if (action === "login") return ok(await login(payload, wxContext));
     if (action === "loginByPhone") return ok(await loginByPhone(payload, wxContext));
+    if (action === "health") return ok({ version: FUNCTION_VERSION, service: "api" });
     if (action === "loginForTest") return ok(await loginForTest(payload));
     if (action === "registrationContext") return ok(await registrationContext(payload));
     if (action === "submitRegistration") return ok(await submitRegistration(payload));
@@ -2117,8 +2460,15 @@ exports.main = async (event) => {
     const viewer = await getAccountBySession(payload.session, wxContext);
     if (!viewer) throw new Error("登录已过期，请重新登录");
 
+    if (viewer.developerReadOnly) {
+      const developerReadActions = ["developerOverview", "developerSwitchRole", "getHomeData", "consumptionHomeData", "dailyCoachCode", "registrationAdminData", "checkinContext", "listPagedData", "previewPeopleImport"];
+      if (developerReadActions.indexOf(action) < 0) throw new Error("开发者视角为只读，不能修改正式数据");
+    }
+
     const actions = {
       getHomeData,
+      developerOverview,
+      developerSwitchRole,
       consumptionHomeData,
       dailyCoachCode,
       registrationAdminData,
@@ -2135,6 +2485,9 @@ exports.main = async (event) => {
       listPagedData,
       saveMember,
       bulkImportMembers,
+      previewPeopleImport,
+      confirmPeopleImport,
+      saveMyProfile,
       saveAccount,
       resetAccountPassword,
       changeMyPassword,

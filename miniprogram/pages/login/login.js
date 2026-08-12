@@ -11,14 +11,15 @@ const testLogin = developerMock
 
 Page({
   data: {
-    mode: "password",
-    account: useMock ? "yeats" : "",
+    mode: "phone",
+    account: "",
     password: useMock ? "1324" : "",
     phone: testLogin.phone || (useMock ? "13333330002" : ""),
     useMock,
     testLogin,
     loading: false,
-    fieldError: ""
+    fieldError: "",
+    helpVisible: false
   },
 
   onLoad() {
@@ -27,8 +28,7 @@ Page({
       this.routeAfterLogin(session);
       return;
     }
-    // 扫教练码进来的家长应直接看到微信手机号入口；普通启动优先老板管理，
-    // 既符合老板高频使用，也避免审核员停在无法体验的授权页。
+    // 所有身份统一从微信手机号入口进入；扫码场景会在识别为家长后继续本次消课。
     if (wx.getStorageSync("pendingCheckinScene")) this.setData({ mode: "phone" });
   },
 
@@ -42,7 +42,7 @@ Page({
   },
 
   onAccountInput(event) {
-    this.setData({ account: event.detail.value, fieldError: "" });
+    this.setData({ account: String(event.detail.value || "").trim(), fieldError: "" });
   },
 
   onPasswordInput(event) {
@@ -57,12 +57,18 @@ Page({
     this.setData({ mode: event.currentTarget.dataset.mode, fieldError: "" });
   },
 
+  showHelp() { this.setData({ helpVisible: true }); },
+  closeHelp() { this.setData({ helpVisible: false }); },
+  openAccountLogin() { this.setData({ helpVisible: false, mode: "password", account: "", password: "", fieldError: "" }); },
+  closeAccountLogin() { this.setData({ mode: "phone", account: "", password: "", fieldError: "" }); },
+  noop() {},
+
   login() {
     if (this.data.loading) return;
     const account = String(this.data.account || "").trim();
     const password = String(this.data.password || "");
-    if (!rules.isChinaMobile(account)) {
-      this.setData({ fieldError: "请输入老板登记的 11 位手机号" });
+    if (!rules.isChinaMobile(account) && account.toLowerCase() !== "yeats") {
+      this.setData({ fieldError: "账号或手机号不正确" });
       return;
     }
     if (!password) {

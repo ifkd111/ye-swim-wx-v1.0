@@ -1,54 +1,45 @@
-<view class="page">
-  <view class="topbar">
-    <view>
-      <view class="title">批量导入</view>
-      <view class="subtitle">复制名单，预览无误后再导入</view>
-    </view>
+<view class="page import-page">
+  <view class="developer-readonly" wx:if="{{readOnly}}"><text>只读</text><view>表格导入不可操作</view></view>
+  <view class="app-header"><view><view class="eyebrow">人员录入</view><view class="title">表格导入</view></view></view>
+
+  <view class="format-card">
+    <view class="format-head"><view class="format-mark">表</view><view><view class="format-title">支持 Excel 与 WPS</view><view class="format-note">XLSX、XLS、ET · 最大 10MB</view></view></view>
+    <view class="format-line"><text>教练 Sheet</text><text>姓名、手机号、状态、备注</text></view>
+    <view class="format-line"><text>学员 Sheet</text><text>姓名、家长手机号、总课时、已上课时、备注</text></view>
+    <view class="same-phone-tip">同一个家长手机号可重复填写多行，分别对应双胞胎或多名孩子。</view>
   </view>
 
-  <view class="card">
-    <view class="card-title">默认信息</view>
-    <view class="form-grid">
-      <view class="field">
-        <text class="field-label">默认校区</text>
-        <input value="{{defaults.campus}}" placeholder="绿洲" bindinput="inputDefault" data-field="campus" />
-      </view>
-      <view class="field">
-        <text class="field-label">默认教练</text>
-        <input value="{{defaults.coach}}" placeholder="绿洲教练" bindinput="inputDefault" data-field="coach" />
-      </view>
-      <view class="field">
-        <text class="field-label">默认课程</text>
-        <input value="{{defaults.productName}}" placeholder="20次卡" bindinput="inputDefault" data-field="productName" />
-      </view>
-      <view class="field">
-        <text class="field-label">默认课时</text>
-        <input type="number" value="{{defaults.totalLessons}}" placeholder="20" bindinput="inputDefault" data-field="totalLessons" />
-      </view>
-    </view>
+  <view class="upload-card {{readOnly ? 'disabled-card' : ''}}" wx:if="{{phase === 'empty'}}" bindtap="chooseFile">
+    <view class="upload-icon">＋</view><view class="upload-title">从微信会话选择表格</view><view class="upload-note">建议使用根目录中的《教练学员批量导入模板》</view><button class="primary choose-button" catchtap="chooseFile">选择文件</button>
   </view>
 
-  <view class="card">
-    <view class="card-title">粘贴名单</view>
-    <view class="meta import-tip">每行一个学员。推荐格式：姓名 手机 校区 教练 总课时。只填姓名也可以。</view>
-    <textarea value="{{rawText}}" placeholder="白卓可 13800000000 绿洲 绿洲教练 26&#10;白卓冉&#10;饼饼 古北 古北教练 20" bindinput="inputRaw" />
-    <view class="toolbar">
-      <button class="primary" bindtap="preview">预览名单</button>
-      <button bindtap="fillSample">示例</button>
-      <button bindtap="clear">清空</button>
-    </view>
+  <view class="section upload-state" wx:elif="{{phase === 'uploading'}}">
+    <view class="file-row"><view class="file-icon">表</view><view><view class="file-name">{{fileName}}</view><view class="section-note">正在上传并核对每一行…</view></view><text>{{uploadProgress}}%</text></view>
+    <view class="progress"><view style="width: {{uploadProgress}}%"></view></view>
   </view>
 
-  <view class="card" wx:if="{{rows.length}}">
-    <view class="row card-head">
-      <view class="card-title">预览 {{rows.length}} 人</view>
-      <button class="primary mini" bindtap="importRows">确认导入</button>
-    </view>
-    <view class="list-item" wx:for="{{rows}}" wx:key="index">
-      <view>
-        <view class="name">{{item.chineseName}}</view>
-        <view class="meta">{{item.phone || '无手机号'}} · {{item.campus}} · {{item.coach}} · {{item.totalLessons}} 课时</view>
-      </view>
-    </view>
+  <view class="section error-card" wx:elif="{{phase === 'error'}}">
+    <view class="error-mark">!</view><view class="section-title">这份表格暂时不能读取</view><view class="error-text">{{error}}</view><view class="error-help">如果是 WPS ET 文件无法识别，请在 WPS 中“另存为 XLSX”后重试。</view><button class="primary wide-action" bindtap="chooseFile">重新选择</button>
   </view>
+
+  <block wx:elif="{{phase === 'preview'}}">
+    <view class="section file-summary"><view class="file-row"><view class="file-icon">表</view><view><view class="file-name">{{fileName}}</view><view class="section-note">教练：{{plan.sheets.coaches}} · 学员：{{plan.sheets.students}}</view></view><text class="change-link" bindtap="chooseFile">更换</text></view></view>
+    <view class="summary-grid">
+      <view><text>{{plan.summary.coachTotal}}</text><text>教练</text><text>新增 {{plan.summary.coachCreate}} · 更新 {{plan.summary.coachUpdate}}</text></view>
+      <view><text>{{plan.summary.studentTotal}}</text><text>学员</text><text>新增 {{plan.summary.studentCreate}} · 更新 {{plan.summary.studentUpdate}}</text></view>
+      <view class="{{plan.summary.errorCount ? 'bad' : 'good'}}"><text>{{plan.summary.errorCount}}</text><text>错误</text><text>{{plan.summary.errorCount ? '必须修正' : '可以导入'}}</text></view>
+    </view>
+
+    <view class="section issue-section" wx:if="{{plan.errors.length || plan.warnings.length}}">
+      <view class="section-head"><view><view class="section-title">检查结果</view><view class="section-note">错误必须修改；提醒不会阻止导入</view></view></view>
+      <view class="issue error" wx:for="{{plan.errors}}" wx:key="index"><text>第 {{item.rowNumber || '-'}} 行</text><view><view>{{item.name}}</view><view>{{item.message}}</view></view></view>
+      <view class="issue warning" wx:for="{{plan.warnings}}" wx:key="index"><text>提醒</text><view><view>{{item.name}}</view><view>{{item.message}}</view></view></view>
+    </view>
+
+    <view class="section preview-list" wx:if="{{plan.coaches.length}}"><view class="section-head"><view><view class="section-title">教练 {{plan.coaches.length}} 位</view><view class="section-note">手机号相同会更新原教练</view></view></view><view class="preview-row" wx:for="{{plan.coaches}}" wx:key="rowNumber"><view class="row-badge">教</view><view><view class="preview-name">{{item.name}}</view><view class="section-note">{{item.phone}} · {{item.status === 'disabled' ? '停用' : '启用'}}</view></view><text class="action-tag {{item.action}}">{{item.action === 'create' ? '新增' : '更新'}}</text></view></view>
+    <view class="section preview-list" wx:if="{{plan.students.length}}"><view class="section-head"><view><view class="section-title">学员 {{plan.students.length}} 名</view><view class="section-note">同一手机号可对应多个孩子</view></view></view><view class="preview-row" wx:for="{{plan.students}}" wx:key="rowNumber"><view class="row-badge student">学</view><view><view class="preview-name">{{item.name}}</view><view class="section-note">{{item.phone}} · 总 {{item.totalLessons}} · 已上 {{item.usedLessons}}</view></view><text class="action-tag {{item.action}}">{{item.action === 'create' ? '新增' : '更新'}}</text></view></view>
+    <button class="primary confirm-button" disabled="{{plan.summary.errorCount > 0}}" loading="{{confirming}}" bindtap="confirmImport">{{plan.summary.errorCount ? '修正错误后再导入' : '确认导入全部人员'}}</button>
+  </block>
+
+  <view class="section done-card" wx:elif="{{phase === 'done'}}"><view class="done-mark">✓</view><view class="section-title">人员导入完成</view><view class="section-note">课时、手机号和账号绑定关系已同步。</view><view class="done-actions"><button bindtap="goCoaches">查看教练</button><button class="primary" bindtap="goMembers">查看学员</button></view><view class="again" bindtap="reset">继续导入另一份表格</view></view>
 </view>

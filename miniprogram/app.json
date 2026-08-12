@@ -1,8 +1,10 @@
 {
   "pages": [
     "pages/login/login",
+    "pages/developer/developer",
     "pages/admin/admin",
     "pages/admin-registration/admin-registration",
+    "pages/admin-import/admin-import",
     "pages/admin-coaches/admin-coaches",
     "pages/admin-members/admin-members",
     "pages/coach/coach",

@@ -102,6 +102,10 @@ async function preview() {
 }
 
 async function upload() {
+  const envConfig = require(path.join(root, "miniprogram", "env.js"));
+  if (envConfig.useMock || envConfig.testLogin && envConfig.testLogin.enabled || envConfig.developerMock && envConfig.developerMock.enabled) {
+    throw new Error("已阻止上传：请先关闭 useMock、testLogin 和 developerMock，本地预览入口不能进入发布版本");
+  }
   const result = await ci.upload({
     project: createProject(),
     version: getVersion(),

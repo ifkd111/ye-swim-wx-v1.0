@@ -1,16 +1,21 @@
 <view class="page registration-admin">
-  <view class="app-header"><view><view class="eyebrow">人员入口</view><view class="title">自助登记</view><view class="subtitle">把二维码发到群里，申请统一由你确认</view></view><view class="pending-pill">待确认 {{pendingCount}}</view></view>
+  <view class="developer-readonly" wx:if="{{readOnly}}"><text>只读</text><view>登记码和申请仅供查看</view></view>
+  <view class="app-header"><view><view class="eyebrow">教练与学员</view><view class="title">人员录入</view></view><view class="pending-pill">待确认 {{pendingCount}}</view></view>
 
-  <view class="guide-card"><view class="guide-step"><text>1</text><view><view>发到群里</view><view>教练扫 A，家长扫 B</view></view></view><view class="guide-step"><text>2</text><view><view>你来核对</view><view>修改姓名和剩余课时</view></view></view><view class="guide-step"><text>3</text><view><view>确认开通</view><view>之后直接用手机号登录</view></view></view></view>
+  <view class="intake-grid">
+    <view class="intake-card featured" bindtap="focusQr"><view class="intake-icon">码</view><view class="intake-copy"><view class="intake-title">二维码扫码</view><view class="intake-note">发给教练或家长，自助填报后由你确认</view></view><text>›</text></view>
+    <view class="intake-card" bindtap="goImport"><view class="intake-icon sheet">表</view><view class="intake-copy"><view class="intake-title">表格导入</view><view class="intake-note">适合已有名单，先检查再一次导入</view></view><text>›</text></view>
+    <view class="intake-card" bindtap="openManualCreate"><view class="intake-icon manual">加</view><view class="intake-copy"><view class="intake-title">手动输入</view><view class="intake-note">临时新增一位教练或一名学员</view></view><text>›</text></view>
+  </view>
 
-  <view class="section qr-section"><view class="section-head"><view><view class="section-title">长期登记码</view><view class="section-note">可反复使用；需要时可更换并让旧码失效</view></view></view>
+  <view class="section qr-section"><view class="section-head"><view><view class="section-title">扫码登记</view><view class="section-note">教练扫 A，家长扫 B；二维码可长期反复使用</view></view></view>
     <view class="registration-error" wx:if="{{loadError}}"><view><view class="error-title">登记码没有读出来</view><view class="error-note">{{loadError}}</view></view><button class="mini" bindtap="retryLoad">重新读取</button></view>
     <view class="qr-loading" wx:elif="{{loading}}"><view class="qr-skeleton"></view><view class="qr-skeleton"></view><view>正在读取 A / B 登记码…</view></view>
     <view class="qr-grid">
       <view class="qr-card" wx:for="{{invites}}" wx:key="inviteType">
         <view class="qr-top"><view class="qr-letter">{{item.letter}}</view><view><view class="qr-title">{{item.title}}</view><view class="qr-note">{{item.note}}</view></view></view>
         <view class="qr-image" data-type="{{item.inviteType}}" bindtap="previewInvite"><image wx:if="{{item.fileId}}" src="{{item.fileId}}" mode="aspectFit"></image><view wx:else class="qr-placeholder"><text>{{item.letter}}</text><view>二维码生成失败</view></view></view>
-        <view class="qr-actions"><button class="primary mini" data-type="{{item.inviteType}}" bindtap="previewInvite" disabled="{{!item.fileId}}">放大二维码</button><button class="mini quiet" data-type="{{item.inviteType}}" bindtap="rotateInvite">更换</button></view>
+        <view class="qr-actions"><button class="primary mini" data-type="{{item.inviteType}}" bindtap="previewInvite" disabled="{{!item.fileId}}">放大二维码</button><button wx:if="{{!readOnly}}" class="mini quiet" data-type="{{item.inviteType}}" bindtap="rotateInvite">更换</button></view>
       </view>
     </view>
   </view>
@@ -27,7 +32,7 @@
   <view class="modal-mask review-mask" wx:if="{{reviewVisible}}" bindtap="closeReview"><view class="review-sheet" catchtap="noop">
     <view class="sheet-handle"></view><view class="sheet-head"><view><view class="eyebrow">老板确认</view><view class="modal-title">{{review.requestType === 'coach' ? '开通教练' : '建立学员档案'}}</view></view><view class="close-button" bindtap="closeReview">×</view></view>
     <view class="locked-phone"><view><view class="locked-label">微信验证手机号</view><view class="locked-value">{{review.phone}}</view></view><view class="lock-badge">不可修改</view></view>
-    <block wx:if="{{review.requestType === 'coach'}}"><label class="field"><text class="field-label">教练姓名</text><input value="{{review.displayName}}" placeholder="例如：陈教练" data-field="displayName" bindinput="reviewInput" /></label><label class="field"><text class="field-label">校区（可选）</text><input value="{{review.campus}}" placeholder="例如：绿洲" data-field="campus" bindinput="reviewInput" /></label></block>
+    <block wx:if="{{review.requestType === 'coach'}}"><label class="field"><text class="field-label">教练姓名</text><input value="{{review.displayName}}" placeholder="例如：陈教练" data-field="displayName" bindinput="reviewInput" /></label></block>
     <block wx:else><view class="review-help">下面的姓名和课时都可以修正，确认后写入正式档案。</view><view class="review-child" wx:for="{{review.children}}" wx:key="clientId"><view class="review-child-title">孩子 {{index + 1}}</view><label class="field"><text class="field-label">系统姓名</text><input value="{{item.proposedName}}" data-index="{{index}}" data-field="proposedName" bindinput="childInput" /></label><label class="field"><text class="field-label">剩余课时</text><input type="number" value="{{item.remainingLessons}}" data-index="{{index}}" data-field="remainingLessons" bindinput="childInput" /></label></view></block>
     <view class="sheet-actions"><button class="danger reject-button" bindtap="reject" disabled="{{saving}}">拒绝</button><button class="primary approve-button" bindtap="approve" loading="{{saving}}">确认并开通</button></view>
   </view></view>

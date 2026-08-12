@@ -1,0 +1,13 @@
+<view class="page developer-page">
+  <view class="app-header"><view><view class="eyebrow">开发者专属</view><view class="title">选择视角</view></view><view class="help-button" bindtap="showHelp">?</view></view>
+  <view class="readonly-banner"><view class="lock-mark">锁</view><view><view>正式数据只读</view><view>可以查看全部界面，不能消课、改课时或修改人员</view></view></view>
+
+  <view class="role-card owner" data-role="admin" bindtap="enter"><view class="role-mark">主</view><view class="role-copy"><view class="role-title">老板视角</view><view class="role-meta">今日流水、人员与课时管理</view></view><text>›</text></view>
+
+  <view class="role-card"><view class="role-mark coach">教</view><view class="role-copy"><view class="role-title">教练视角</view><picker wx:if="{{coaches.length}}" range="{{coaches}}" range-key="coachName" value="{{coachIndex}}" bindchange="coachChange"><view class="account-picker">{{coaches[coachIndex].coachName || coaches[coachIndex].fullName}}⌄</view></picker><view wx:else class="role-meta">暂无教练账号</view></view><button class="mini" data-role="coach" catchtap="enter">进入</button></view>
+
+  <view class="role-card"><view class="role-mark student">学</view><view class="role-copy"><view class="role-title">学员视角</view><picker wx:if="{{students.length}}" range="{{students}}" range-key="fullName" value="{{studentIndex}}" bindchange="studentChange"><view class="account-picker">{{students[studentIndex].fullName}}⌄</view></picker><view wx:else class="role-meta">暂无家长账号</view></view><button class="mini" data-role="student" catchtap="enter">进入</button></view>
+
+  <view class="logout" bindtap="logout">退出开发者身份</view>
+  <view class="modal-mask" wx:if="{{helpVisible}}" bindtap="closeHelp"><view class="modal-card" catchtap="noop"><view class="modal-title">只读视角</view><view class="modal-meta">此入口只会在微信真实授权手机号为开发者号码时出现。所有写操作同时由页面和云端拦截，不会改变正式数据。</view><button class="primary wide-action" bindtap="closeHelp">知道了</button></view></view>
+</view>

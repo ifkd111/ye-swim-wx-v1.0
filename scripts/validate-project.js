@@ -34,7 +34,7 @@ function main() {
   assert(exists(qrCodePath), "缺少二维码绘制工具");
 
   const appJson = readJson(appJsonPath);
-  assert(Array.isArray(appJson.pages) && appJson.pages.length === 10, "V2.1 应保留 10 个必要页面");
+  assert(Array.isArray(appJson.pages) && appJson.pages.length === 12, "V2.1.5 应保留 12 个必要页面");
 
   appJson.pages.forEach((page) => {
     ["js", "json", "wxml", "wxss"].forEach((ext) => {
@@ -60,6 +60,7 @@ function main() {
   if (useMockMatch && useMockMatch[1] === "false") {
     assert(!envConfig.testLogin || !envConfig.testLogin.enabled, "正式环境不应开启测试登录入口");
     assert(!envConfig.testLogin || !envConfig.testLogin.phone, "正式环境不应内置测试手机号");
+    assert(!envConfig.developerMock || !envConfig.developerMock.enabled, "正式上传前必须关闭本地开发预览");
     ["1324", "1234", "yeats", "jl001", "xy001"].forEach((hint) => {
       assert(!loginSource.includes(hint), "正式环境登录页不应展示默认账号或密码：" + hint);
     });
@@ -99,6 +100,11 @@ function main() {
     "listPagedData",
     "saveMember",
     "bulkImportMembers",
+    "previewPeopleImport",
+    "confirmPeopleImport",
+    "saveMyProfile",
+    "developerOverview",
+    "developerSwitchRole",
     "saveAccount",
     "resetAccountPassword",
     "changeMyPassword",

@@ -10,7 +10,10 @@ function envVersion() {
 }
 
 function developerMockEnabled() {
-  return Boolean(env.developerMock && env.developerMock.enabled && envVersion() === "develop");
+  if (envVersion() !== "develop") return false;
+  let localEnabled = false;
+  try { localEnabled = wx.getStorageSync("__yeLocalRolePreview") === true; } catch (error) { localEnabled = false; }
+  return Boolean(env.developerMock && env.developerMock.enabled || localEnabled);
 }
 
 function useMock() {

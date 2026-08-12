@@ -30,18 +30,26 @@ Page({
     filter: "all",
     filterStats: { all: 0, active: 0, pending: 0, disabled: 0 },
     form: emptyForm("jl001"),
-    saving: false
+    saving: false,
+    readOnly: false
   },
 
+  onLoad(options) { this.createAfterLoad = Boolean(options && options.create === "1"); },
+
   onShow() {
-    if (!api.requireSession("admin")) return;
+    const session = api.requireSession("admin");
+    if (!session) return;
+    this.setData({ readOnly: Boolean(session.developerReadOnly) });
     this.load();
   },
 
   load() {
     api.call("consumptionHomeData").then((data) => {
       const accounts = data.accounts || [];
-      this.setData({ accounts }, () => this.applyFilter());
+      this.setData({ accounts }, () => {
+        this.applyFilter();
+        if (this.createAfterLoad) { this.createAfterLoad = false; this.openCreate(); }
+      });
     }).catch(api.fail);
   },
 
@@ -81,6 +89,7 @@ Page({
   },
 
   openCreate() {
+    if (this.data.readOnly) return api.toast("开发者视角为只读");
     this.setData({
       viewMode: "form",
       form: emptyForm(nextCoachAccount(this.data.accounts))
@@ -89,6 +98,7 @@ Page({
   },
 
   editCoach(event) {
+    if (this.data.readOnly) return;
     const coach = (this.data.accounts || []).find((item) => item.id === event.currentTarget.dataset.id);
     if (!coach) return;
     this.setData({

@@ -30,8 +30,10 @@ Page({
   goCoaches() { wx.navigateTo({ url: "/pages/admin-coaches/admin-coaches" }); },
   goMembers() { wx.navigateTo({ url: "/pages/admin-members/admin-members" }); },
   goRegistration() { wx.navigateTo({ url: "/pages/admin-registration/admin-registration" }); },
+  switchDeveloper() { wx.reLaunch({ url: "/pages/developer/developer" }); },
   previewCode() { if (this.data.code && this.data.code.fileId) wx.previewImage({ urls: [this.data.code.fileId] }); },
   openManual() {
+    if (this.data.viewer.developerReadOnly) return api.toast("开发者视角为只读");
     const now = rules.shanghaiNow();
     this.setData({ manualVisible: true, selectedCoach: this.data.viewer.account, manualMembers: this.data.members.map((item) => Object.assign({}, item, { selected: false })), manualLessons: 1, manualDate: rules.formatDateChina(now), manualTime: String(now.getHours()).padStart(2,"0") + ":" + String(now.getMinutes()).padStart(2,"0"), manualReason: "老板补录" });
   },
@@ -52,6 +54,7 @@ Page({
     api.call("manualConsumption", { coachAccount: this.data.selectedCoach, memberIds: ids, lessons: this.data.manualLessons, attendanceDate: this.data.manualDate, attendanceTime: this.data.manualTime, reason: this.data.manualReason }).then((result) => { api.done(result.message); this.closeManual(); this.load(); }).catch(api.fail).finally(() => this.setData({ saving: false }));
   },
   manageLog(event) {
+    if (this.data.viewer.developerReadOnly) return api.toast("开发者视角为只读");
     const log = this.data.todayLogs.find((item) => item.id === event.currentTarget.dataset.id);
     if (!log) return;
     wx.showActionSheet({ itemList: ["修改扣除课时", "撤销本次消课"], success: (choice) => choice.tapIndex === 0 ? this.adjustLog(log) : this.reverseLog(log) });

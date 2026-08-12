@@ -79,6 +79,7 @@ function fail(error) {
 }
 
 function homePath(role) {
+  if (role === "developer") return "/pages/developer/developer";
   if (role === "admin") return "/pages/admin/admin";
   if (role === "coach") return "/pages/coach/coach";
   if (role === "student") return "/pages/student/student";
